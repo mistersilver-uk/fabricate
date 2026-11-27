@@ -478,6 +478,22 @@ export default [
     },
   },
 
+  // 5f. The secure-context-only id API (issue 3032): a remote `http://<ip>` client lacks it, so
+  //     module code mints through `src/utils/randomId.js`. `no-restricted-properties` leaves 5e's
+  //     `no-restricted-syntax` untouched; `tests/random-uuid-lint.test.js` pins both.
+  {
+    files: ['src/**/*.js', 'src/**/*.svelte'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'randomUUID',
+          message: 'randomUUID needs a secure context; use src/utils/randomId.js',
+        },
+      ],
+    },
+  },
+
   // 6. Node tooling (build/release scripts and root config files). These are
   //    CLI entry points, so process control and console output are expected.
   //

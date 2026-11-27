@@ -116,6 +116,7 @@ const CRAFTING_MODE_FILES = Object.freeze({
   simple: ['SimpleRecipeBody', 'StepRequirementsList'],
   routedByIngredients: ['IngredientRoutedBody'],
   routedByCheck: ['RoutedByCheckBody', 'OutcomeTierTable'],
+  iterative: ['IterativeRecipeBody'],
   progressive: [
     'ProgressiveBody',
     'ProgressiveStageList',
@@ -150,6 +151,7 @@ export const CRAFTING_SIMPLE = craftingMode('simple');
 export const CRAFTING_ROUTED_INGREDIENTS = craftingMode('routedByIngredients');
 export const CRAFTING_ROUTED_CHECK = craftingMode('routedByCheck');
 export const CRAFTING_PROGRESSIVE = craftingMode('progressive');
+export const CRAFTING_ITERATIVE = craftingMode('iterative');
 
 /** The progressive stage list and the row and band it composes; salvage draws them too (issue 2381). */
 export const PROGRESSIVE_STAGE_PARTS =

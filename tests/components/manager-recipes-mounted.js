@@ -272,7 +272,7 @@ export function registerRecipesCases() {
     assert.ok(r2Blocked, "an incomplete, disabled recipe row should say it can't be enabled");
     assert.equal(r2Blocked.textContent.trim(), "Can't enable");
     assert.ok(
-      target.querySelector('[data-recipe-id="r1"] .manager-chip.is-warning') === null,
+      target.querySelector('[data-recipe-id="r1"] [data-recipe-status].is-warning') === null,
       'a complete recipe row should not render an authoring-state pill'
     );
 

@@ -7,7 +7,11 @@
 
   Props: `recipe`, `authorityRefusal` (the localized refusal, or `''`), `canCraft` (the live
   craftability: `true`, `false`, or `null` when nothing evaluated it), `craftLabel` (the commit
-  verb, or `''` when it is unavailable, which renders no primary), `busy`, `onCraft`.
+  verb, or `''` when it is unavailable, which renders no primary), `busy`, `onCraft`, and
+  `primaryIcon` / `primaryHook` (the primary's glyph and `data-*` hook when it is not the Craft
+  verb: a hook names a primary that rolls nothing, so it takes no roll-prompt origin).
+  An iterative recipe holding a workpiece (`recipe.iterative.workpiece`) is mid-work, so the header
+  states no status, scrim or blocker for it.
 -->
 <script>
   import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
@@ -31,6 +35,8 @@
     craftLabel = '',
     busy = false,
     onCraft = null,
+    primaryIcon = '',
+    primaryHook = '',
   } = $props();
 
   const name = $derived(String(recipe?.name ?? ''));
@@ -41,6 +47,7 @@
   // a baked "available" yields to the live reading: `false` reads as missing materials, and
   // `null` claims nothing, neither readiness nor a shortfall.
   const listedStatus = $derived(String(recipe?.browseStatus ?? ''));
+  const working = $derived(Boolean(recipe?.iterative?.workpiece));
   const unconfirmed = $derived(
     listedStatus === CRAFTING_BROWSE_STATUS.AVAILABLE && !redacted && !busy && canCraft !== true
   );
@@ -73,9 +80,10 @@
   // Danger tone === the player cannot craft this (missing materials, or a check that refuses
   // this character). Gate on the tone so the presentation map stays the single source of
   // truth, mirroring the RecipeListRow treatment.
-  const uncraftable = $derived(descriptor.tone === 'danger');
+  const uncraftable = $derived(descriptor.tone === 'danger' && !working);
   const statusLabel = $derived(localize(descriptor.labelKey));
   const blockingReasons = $derived.by(() => {
+    if (working) return [];
     if (status !== listedStatus) return [localize(BROWSE_BLOCKING_REASON_KEYS[status])];
     return Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : [];
   });
@@ -83,7 +91,7 @@
   // drops the status chip. The recipe's own blocker leads the callout, because it is the one the
   // player can act on, and the refusal states its consequence because the primary stays enabled:
   // availability is a cache, and a stale `false` must not disable the pane's only way forward.
-  const refusal = $derived(String(authorityRefusal ?? '').trim());
+  const refusal = $derived(working ? '' : String(authorityRefusal ?? '').trim());
   const refusalLine = $derived(
     refusal ? `${refusal} ${localize('FABRICATE.App.Crafting.Blocking.AuthorityRefused')}` : ''
   );
@@ -101,10 +109,13 @@
     {...resolveCraftingArt(recipe?.img)}
     artDimmed={uncraftable}
     {primaryLabel}
-    primaryIcon={busy ? 'fas fa-spinner fa-spin' : 'fas fa-hammer'}
+    primaryIcon={primaryIcon || (busy ? 'fas fa-spinner fa-spin' : 'fas fa-hammer')}
     primaryBusy={busy}
-    primaryProps={{ 'data-crafting-craft': '', 'data-crafting-craft-disabled': String(busy) }}
-    onclick={(event) => withRollPromptOrigin(event, () => onCraft?.())}
+    primaryProps={primaryHook
+      ? { [primaryHook]: '' }
+      : { 'data-crafting-craft': '', 'data-crafting-craft-disabled': String(busy) }}
+    onclick={(event) =>
+      primaryHook ? onCraft?.() : withRollPromptOrigin(event, () => onCraft?.())}
   >
     {#snippet tileOverlay()}
       {#if uncraftable}
@@ -142,7 +153,7 @@
         </span>
       {/if}
       <!-- Uncraftable moves the status onto the tile's pip, so the labelled chip is dropped. -->
-      {#if !uncraftable && !refusal && !unconfirmed}
+      {#if !working && !uncraftable && !refusal && !unconfirmed}
         <Chip
           density="list"
           tone={statusChipTone(descriptor.tone)}

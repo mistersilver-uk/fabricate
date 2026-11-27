@@ -22,7 +22,7 @@
     subscribeWorldTime,
     subscribeInventoryChange,
     subscribeCraftingDataChange,
-    subscribeActorRunFlagChange,
+    subscribeSelectedActorRunFlagChanges,
     subscribeJournalAuthorityRestored,
     subscribeJournalDismissalsChange,
   } from '../util/foundryBridge.js';
@@ -386,14 +386,13 @@
   // another client (or the primary-GM world-time resume) writes the selected actor's
   // run flags. main.js drops the stale run-manager cache on the same updateActor hook,
   // so this quiet re-fetch reads the freshly-persisted runs without a full app reload.
-  // Gated to the selected journal actor so unrelated actors' updates are ignored.
+  // Gated to each store's selected actor so unrelated actors' updates are ignored.
+  // The Crafting tab reads an iterative recipe's workpiece from those same runs (issue 3011).
   $effect(() =>
-    subscribeActorRunFlagChange(() => services?.journal?.load?.(true), {
-      isRelevantActor: (actorId) => {
-        const selected = services?.getSelectedActorId?.() || null;
-        return Boolean(selected) && String(selected) === String(actorId);
-      },
-    })
+    subscribeSelectedActorRunFlagChanges([
+      [() => services?.journal?.load?.(true), () => services?.getSelectedActorId?.()],
+      [() => services?.crafting?.load?.(true), () => services?.getSelectedCraftingActorId?.()],
+    ])
   );
 
   // Is the actor whose items just changed one this app's crafting/inventory views

@@ -51,12 +51,19 @@
   const named = (key, fallback) => fill(text(key, fallback), { counter: row.label });
   const instance = $derived(row.instance ?? {});
   const faultId = (index) => `${idPrefix}-fault-${index}`;
-  /** `aria-invalid` and `aria-describedby` for the control `control` while a fault marks it. */
+  const validationTarget = $derived(`iterative-counter-${row.counterId}`);
+  /** `aria-invalid`, `aria-describedby` and the Validation focus target for `control` while a fault marks it. */
   function marks(control) {
     const ids = row.faults.flatMap((fault, index) =>
       fault.control === control ? [faultId(index)] : []
     );
-    return ids.length ? { 'aria-invalid': 'true', 'aria-describedby': ids.join(' ') } : {};
+    return ids.length
+      ? {
+          'aria-invalid': 'true',
+          'aria-describedby': ids.join(' '),
+          'data-validation-target': validationTarget,
+        }
+      : {};
   }
 
   function resolveStart(expression) {
@@ -166,6 +173,7 @@
         role="ghost"
         size="24"
         data-iterative-counter-create={row.key}
+        data-validation-target={validationTarget}
         onclick={onCreateCounter}
         >{text('FABRICATE.Admin.Manager.Recipe.Iterative.CreateCounter', 'Create counter')}</Button
       >

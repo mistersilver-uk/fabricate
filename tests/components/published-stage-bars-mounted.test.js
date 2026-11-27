@@ -223,6 +223,29 @@ describe('the published StageBars under a bare ancestor', () => {
     assert.deepEqual(reports, []);
   });
 
+  it('paints a stage whose status is failed danger, and an update clears it in place', async () => {
+    const forging = (status) => ({
+      stages: [
+        { name: 'Gather', value: 100, status },
+        { name: 'Refine', value: 40 },
+      ],
+      currentIndex: 1,
+      ariaLabel: 'Forging progress',
+    });
+    const { target, handle } = mountStages(forging('failed'));
+    const states = () =>
+      [...target.querySelectorAll('[data-stage-bars-state]')].map(
+        (stage) => stage.dataset.stageBarsState
+      );
+    assert.deepEqual(states(), ['danger', 'accent'], 'the seam passes a stage its status');
+    assert.equal(handle.update(forging('done')), true);
+    await settle();
+    assert.deepEqual(states(), ['success', 'accent'], 'any other status draws as none');
+    handle.destroy();
+    await settle();
+    assert.deepEqual(reports, []);
+  });
+
   it('draws one caption line in its muted ink from :root[data-fabricate-theme]', async () => {
     await underSheet(
       ':root[data-fabricate-theme] { --fab-text-muted: rgb(7, 8, 9); }',

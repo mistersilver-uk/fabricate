@@ -254,7 +254,7 @@ export function playerCountResultCases() {
       sourceMatches: [
         CRAFTING_SHARED,
         CRAFTING_SIMPLE,
-        /^src\/ui\/presenters\/(?:CraftingListingBuilder|checkDescriptor)\.js$/,
+        /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingFormulaDisplay|checkDescriptor)\.js$/,
       ],
     }),
   ];

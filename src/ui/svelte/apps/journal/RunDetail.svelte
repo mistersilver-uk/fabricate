@@ -7,6 +7,7 @@
   import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import Callout from '../../components/Callout.svelte';
   import Chip from '../../components/Chip.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import ListRow from '../../components/ListRow.svelte';
@@ -39,6 +40,9 @@
   import HistoricalRunDetail from './HistoricalRunDetail.svelte';
   import RecoveryEvidence from './RecoveryEvidence.svelte';
   import ThisRun from './ThisRun.svelte';
+  import CraftingYieldPreview from './CraftingYieldPreview.svelte';
+  import AttemptLedger from './iterative/AttemptLedger.svelte';
+  import WorkpieceView from './iterative/WorkpieceView.svelte';
   import { presentStage } from './historyPresentation.js';
 
   let { run = null, journal = null, now = 0, services = null } = $props();
@@ -48,6 +52,7 @@
     runStatusPresentation(run?.recoveryEvidence?.status === 'planned' ? 'inProgress' : status)
   );
   const terminal = $derived(['succeeded', 'failed', 'cancelled'].includes(status));
+  const workpiece = $derived(terminal ? null : (run?.iterative ?? null));
   // The same "waiting on you" signal the Active row carries, so the opened run agrees with
   // the list it was opened from (M10).
   const attention = $derived(runAttentionPresentation(run));
@@ -181,7 +186,9 @@
   );
   const transient = $derived(journal?.commandResult?.runKey === runIdentity);
   // ONE run, ONE state, ONE notice — see `runStateNotice.js`.
-  const stateNotice = $derived(runStateNotice(run, localize));
+  const stateNotice = $derived(
+    runStateNotice(run, localize, journal?.iterative?.noticeFor?.(run) ?? null)
+  );
   let reconciling = $state(false);
 
   /** Offer the active GM the two dispositions the authority honours, then record one. */
@@ -206,6 +213,7 @@
   const guidanceKey = $derived.by(() => {
     if (run?.recoveryEvidence?.required) return 'FABRICATE.App.Journal.WhatToExpect.Recovery';
     if (terminal) return 'FABRICATE.App.Journal.WhatToExpect.Terminal';
+    if (workpiece) return 'FABRICATE.App.Journal.WhatToExpect.Iterative';
     if (!viewedIsCurrent)
       return viewedIndex < currentIndex
         ? 'FABRICATE.App.Journal.WhatToExpect.Past'
@@ -370,7 +378,17 @@
   });
 </script>
 
-<article class="journal-detail" data-journal-detail data-run-key={run?.key ?? run?.id}>
+<article
+  class="journal-detail"
+  data-journal-detail
+  data-run-key={run?.key ?? run?.id}
+  data-workpiece={workpiece ? '' : undefined}
+  data-iterative-steps={workpiece?.progress?.stages?.length}
+  data-iterative-refund={workpiece ? (run?.refundOnCancel === false ? 'off' : 'on') : undefined}
+  data-iterative-enabled={workpiece?.cards?.filter((card) => card.enabled).length}
+  data-iterative-viewer={workpiece?.viewer}
+  data-iterative-redacted={workpiece ? String(workpiece.redacted === true) : undefined}
+>
   <!-- The controls and the state they are refused by read as ONE block, not as a callout
        floating beside the buttons it talks about. -->
   <section class="journal-detail-state">
@@ -379,6 +397,8 @@
         {#snippet meta()}
           {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
           {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
+          {#if run?.iterative?.meta?.step}<span>{run.iterative.meta.step}</span>{/if}
+          {#if run?.iterative?.meta?.session}<span>{run.iterative.meta.session}</span>{/if}
           {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
         {/snippet}
         {#snippet chips()}
@@ -408,6 +428,8 @@
         blocking={stateNotice.blocking}
         title={stateNotice.title}
         detail={stateNotice.detail}
+        icon={stateNotice.icon ?? ''}
+        evidence={stateNotice.ledger || stateNotice.yields?.length ? noticeEvidence : null}
         {...stateNotice.hooks}
         action={stateNotice.claim
           ? {
@@ -416,7 +438,24 @@
             }
           : null}
       />
+    {:else if workpiece}
+      <EmptyState
+        inline
+        icon="fas fa-clock-rotate-left"
+        hint={localize('FABRICATE.App.Journal.Iterative.Notice.Idle')}
+        data-iterative-idle=""
+      />
     {/if}
+    {#snippet noticeEvidence()}
+      {#if stateNotice?.ledger}<AttemptLedger row={stateNotice.ledger} />{/if}
+      {#each stateNotice?.yields ?? [] as item (item.id)}
+        <ListRow
+          name={item.name ?? ''}
+          art={item.img ?? ''}
+          quantity={quantityText(item.quantity, localize)}
+        />
+      {/each}
+    {/snippet}
     <RunAwardChoice {run} {journal} />
   </section>
 
@@ -436,9 +475,11 @@
   {/if}
 
   {#if terminal}
-    <HistoricalRunDetail {run} {services} {transient} />
+    <HistoricalRunDetail {run} {services} {transient} {journal} />
   {:else}
-    {#if stages.length > 0}
+    {#if workpiece}
+      <WorkpieceView {run} runKey={runIdentity} {journal} {services} />
+    {:else if stages.length > 0}
       <section class="journal-detail-stages" data-journal-stages>
         <RunProgress
           {stages}
@@ -510,7 +551,7 @@
       />
     {/if}
 
-    {#if currentGate && viewedIsCurrent && run?.lifecycleContract !== 'current' && !run?.pauseState}<TimeRemainingBox
+    {#if !workpiece && currentGate && viewedIsCurrent && run?.lifecycleContract !== 'current' && !run?.pauseState}<TimeRemainingBox
         availableAt={currentGate.availableAt}
         hintKey={run?.isFinalStep
           ? 'FABRICATE.App.Journal.TimeRemaining.WhenPassedFinal'
@@ -589,66 +630,12 @@
       {:else}<span>{localize('FABRICATE.App.Journal.History.NotRecorded')}</span>{/each}
     {/snippet}
 
-    {#snippet craftingPreview()}
-      {#if craftingYield}
-        <div data-journal-crafting-yield={craftingYield.presentation}>
-          {#if craftingYield.presentation === 'tiers'}
-            <OutcomeLadder
-              tiers={previewTiers(craftingYield.tiers, localize)}
-              emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
-              label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-              successLabel={localize('FABRICATE.Check.Evidence.Success')}
-              failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
-              hint={localize(
-                viewedIsCurrent
-                  ? 'FABRICATE.App.Journal.Yields.CraftingPreviewHint'
-                  : 'FABRICATE.App.Journal.Yields.FuturePreviewHint'
-              )}
-            />
-          {:else if craftingYield.presentation === 'progressive'}
-            <InspectorCard>
-              <h3>{localize('FABRICATE.App.Journal.Yields.ProgressiveTitle')}</h3>
-              <p>{localize('FABRICATE.App.Journal.Yields.ProgressiveHint')}</p>
-              <JournalFactRow
-                label={localize('FABRICATE.App.Journal.Yields.AwardMode')}
-                value={localize(
-                  `FABRICATE.App.Journal.Yields.AwardModes.${craftingYield.progressive?.awardMode ?? 'equal'}`
-                )}
-              />
-              {#each craftingYield.progressive?.stages ?? [] as entry, index (index)}
-                <ListRow
-                  name={`${index + 1}. ${previewName(entry, localize)}`}
-                  art={entry.art ?? ''}
-                  quantity={entry.quantity ?? localize('FABRICATE.App.Journal.History.NotRecorded')}
-                  detail={entry.cost == null
-                    ? localize('FABRICATE.App.Journal.Yields.UnknownCost')
-                    : localize('FABRICATE.App.Journal.Yields.BudgetCost', {
-                        quantity: entry.quantity,
-                        cost: entry.cost,
-                      })}
-                />
-              {/each}
-            </InspectorCard>
-          {:else if craftingYield.presentation === 'routes'}
-            <p>{localize('FABRICATE.App.Journal.History.FutureRoutes')}</p>
-            {#each craftingYield.routes ?? [] as route, index (index)}
-              <section class="fab-stack" data-gap="1">
-                <Kicker>{route.name || localize('FABRICATE.App.Journal.Stage.Route')}</Kicker>
-                {#each route.entries ?? [] as entry, itemIndex (entry.id ?? itemIndex)}
-                  <ListRow
-                    name={previewName(entry, localize)}
-                    art={entry.art ?? ''}
-                    quantity={quantityText(entry.qty, localize)}
-                  />
-                {:else}<p>{localize('FABRICATE.App.Journal.History.NotRecorded')}</p>{/each}
-              </section>
-            {/each}
-          {/if}
-        </div>
-      {/if}
-    {/snippet}
+    {#snippet craftingPreview()}<CraftingYieldPreview
+        {craftingYield}
+        current={viewedIsCurrent}
+      />{/snippet}
 
-    {#if viewedIsCurrent}<div class="journal-detail-summary" data-journal-summary>
+    {#if viewedIsCurrent && !workpiece}<div class="journal-detail-summary" data-journal-summary>
         <InspectorCard class="journal-summary-card" data-journal-summary-card="time">
           <div class="journal-summary-heading">
             <Medallion size={26} icon="fas fa-clock" />

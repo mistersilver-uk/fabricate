@@ -297,6 +297,7 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconCatalogue.json',
   // Issue 2511: the shared draft-id mint and pending focus the card and the group read.
   'src/ui/svelte/util/draftId.js',
+  'src/utils/randomId.js',
   'src/ui/svelte/util/pendingFocus.js'
 ]);
 
@@ -346,6 +347,7 @@ export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
   'src/ui/svelte/util/draftId.js',
+  'src/utils/randomId.js',
   'src/ui/svelte/util/pendingFocus.js'
 ]);
 
@@ -429,6 +431,119 @@ export const OUTCOME_LADDER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/essenceTint.js',
 ]);
 
+// The iterative attempt store (issue 3011) and the presenters it words its notices with, which the
+// journal store imports.
+export const ITERATIVE_ATTEMPT_RAW_MODULES = Object.freeze([
+  'src/systems/iterative/counterRule.js',
+  'src/ui/svelte/stores/journalLegacyCommands.js',
+  'src/ui/presenters/iterative/iterativeFocusTarget.js',
+  'src/ui/presenters/iterative/iterativeNotice.js',
+  'src/ui/presenters/iterative/iterativeRefusalCopy.js',
+  'src/ui/presenters/iterative/iterativeRuleText.js',
+  'src/ui/presenters/iterative/iterativeVerdict.js',
+]);
+
+// The Workpiece view an active iterative run's detail draws (issue 3011): its own parts, a closed
+// run's record, the moved crafting yield preview, the primitives they render and their helpers.
+export const WORKPIECE_VIEW_RAW_MODULES = Object.freeze([
+  ...OUTCOME_LADDER_RAW_MODULES,
+  'src/systems/iterative/counterRule.js',
+  'src/ui/presenters/iterative/iterativeRuleText.js',
+  'src/ui/presenters/iterative/iterativeVerdict.js',
+  'src/ui/svelte/apps/journal/iterative/workpieceBar.js',
+  'src/ui/svelte/apps/journal/iterative/workpieceFocus.js',
+  'src/ui/svelte/apps/journal/iterative/workpieceStepCard.js',
+]);
+export const WORKPIECE_VIEW_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Pagination.svelte',
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/DataTable.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/ListRow.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/Meter.svelte',
+  'src/ui/svelte/components/OutcomeLadder.svelte',
+  'src/ui/svelte/components/RunProgress.svelte',
+  'src/ui/svelte/components/StageBars.svelte',
+  'src/ui/svelte/components/StageCard.svelte',
+  'src/ui/svelte/components/StageNav.svelte',
+  'src/ui/svelte/components/Well.svelte',
+  'src/ui/svelte/apps/journal/JournalFactRow.svelte',
+  'src/ui/svelte/apps/journal/CraftingYieldPreview.svelte',
+  'src/ui/svelte/apps/journal/iterative/ActionCard.svelte',
+  'src/ui/svelte/apps/journal/iterative/AttemptLedger.svelte',
+  'src/ui/svelte/apps/journal/iterative/CounterCard.svelte',
+  'src/ui/svelte/apps/journal/iterative/CounterSection.svelte',
+  'src/ui/svelte/apps/journal/iterative/SessionsTable.svelte',
+  'src/ui/svelte/apps/journal/iterative/WorkpieceStep.svelte',
+  'src/ui/svelte/apps/journal/iterative/WorkpieceView.svelte',
+  'src/ui/svelte/apps/journal/iterative/WorkpieceRecord.svelte',
+]);
+
+// The run detail's whole tree, shared by the suites that mount `RunDetail.svelte` itself (issue
+// 3011): its shipped stages, actions, history and recovery, and the Workpiece view.
+export const RUN_DETAIL_RAW_MODULES = Object.freeze([
+  ...WORKPIECE_VIEW_RAW_MODULES,
+  'src/ui/svelte/util/rollPromptOrigin.js',
+  // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+  'src/ui/svelte/util/focusWhenEnabled.js',
+  // Issue 1504/1506: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
+  // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
+  'src/ui/svelte/util/journalRunReasons.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
+  'src/ui/svelte/util/formatDuration.js',
+  'src/ui/svelte/util/worldTimeLabel.js',
+  'src/systems/foundryCalendar.js',
+  'src/ui/svelte/apps/journal/journalRunStatus.js',
+  'src/ui/svelte/apps/journal/historyPresentation.js',
+  // Issue 1773: a reward row's glyph, and the award face's rows.
+  'src/ui/presenters/resultKindGlyphs.js',
+  'src/ui/svelte/apps/journal/runStateNotice.js',
+  'src/ui/presenters/awardChoiceRows.js',
+  'src/ui/svelte/apps/journal/runDetailPresentation.js',
+  // The roll line signs an executed margin with the shared formatter (issue 2005).
+  'src/utils/checkAdjustmentFormat.js',
+  'src/utils/scalars.js',
+  'src/ui/svelte/apps/journal/stageHeading.js',
+  'src/ui/svelte/apps/journal/runRecovery.js',
+  // Issue 1506: the run's status is a `<Chip>` now.
+  ...STATUS_TONE_RAW_MODULES,
+]);
+export const RUN_DETAIL_COMPILED_MODULES = Object.freeze([
+  ...WORKPIECE_VIEW_COMPILED_MODULES,
+  // Issue 1506: the journal's status pill retired into the shared chip.
+  ...SEARCHABLE_POPOVER_COMPILED_MODULES,
+  ...PLAYER_APP_COMPILED_MODULES,
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/RunActionBar.svelte',
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/SlotRow.svelte',
+  'src/ui/svelte/components/ChoiceOptionList.svelte',
+  'src/ui/svelte/components/EssencePool.svelte',
+  'src/ui/svelte/components/YieldScale.svelte',
+  'src/ui/svelte/apps/journal/JournalCard.svelte',
+  'src/ui/svelte/apps/journal/StepTimeline.svelte',
+  'src/ui/svelte/apps/journal/StepDetails.svelte',
+  'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
+  'src/ui/svelte/apps/journal/ActionsPanel.svelte',
+  'src/ui/svelte/apps/journal/RunDetail.svelte',
+  'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
+  'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
+  'src/ui/svelte/apps/journal/RecoveryEvidence.svelte',
+  'src/ui/svelte/apps/journal/ThisRun.svelte',
+]);
+
 // The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath
 // them and the per-drop breakdown it opens.
 export const GATHERING_DROPS_COMPILED_MODULES = Object.freeze([
@@ -479,7 +594,25 @@ export const ADDITIONAL_DICE_NOTICE_RAW_MODULES = Object.freeze([
   'src/systems/countTriggerReach.js',
 ]);
 
+// The iterative recipe's Crafting-tab face (issue 3011) and the check formula display the listing
+// builder delegates to: what `CraftingListingBuilder` imports to project a workpiece's goal and run.
+export const ITERATIVE_CRAFTING_FACE_RAW_MODULES = Object.freeze([
+  'src/ui/presenters/craftingFormulaDisplay.js',
+  'src/ui/presenters/iterative/iterativeCraftingFace.js',
+  'src/ui/presenters/iterative/iterativeCounters.js',
+  'src/ui/presenters/iterative/iterativeRuleText.js',
+  'src/ui/presenters/iterative/iterativeRunRead.js',
+  'src/models/iterativeStepConfig.js',
+  'src/systems/iterative/attemptLibrary.js',
+  'src/systems/iterative/counterRule.js',
+  'src/systems/iterative/expression.js',
+  'src/systems/iterative/iterativeStepState.js',
+  'src/systems/iterative/preflightAttempt.js',
+  'src/systems/normalize/iterativeLibrary.js',
+]);
+
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
+  ...ITERATIVE_CRAFTING_FACE_RAW_MODULES,
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -519,6 +652,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/presenters/resultKindGlyphs.js',
   'src/utils/choiceGroupShape.js',
   'src/systems/currencyProfile.js',
+  'src/utils/randomId.js',
   'src/config/currencyPresets.js',
   // Issue 2005: the check card's roll-under or character-value target line.
   'src/ui/presenters/checkDescriptor.js',
@@ -679,6 +813,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
   'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
+  'src/ui/svelte/apps/crafting/detail/IterativeRecipeBody.svelte',
   // ProgressiveBody's stage list (issue 651): the shared list and the row and band it composes.
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',

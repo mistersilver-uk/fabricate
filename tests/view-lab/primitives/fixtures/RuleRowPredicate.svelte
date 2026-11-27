@@ -11,6 +11,7 @@
     props = {},
     icon,
     title,
+    connective,
     removeLabel,
     sourceLabel,
     opLabel,
@@ -45,7 +46,7 @@
     <Stepper ariaLabel={valueLabel} value={rule.value} onChange={change} />
   {/snippet}
   {@const schema = {
-    head: () => ({ glyph: icon, title }),
+    head: () => ({ glyph: icon, title, connective }),
     steps: [source, op, amount].map((render, index) => ({ key: index, render })),
     labels: { remove: removeLabel },
   }}

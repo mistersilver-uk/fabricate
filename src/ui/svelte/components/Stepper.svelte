@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(file-size): the dense rung's rules (issue 2841) override the scoped default-rung outset of both parts and the toolbar rung's (issue 2903) the input's, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token -->
+<!-- ratchet-exempt(file-size): the dense rung's rules (issue 2841) override the scoped default-rung outset of both parts and the toolbar rung's (issue 2903) the input's, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token; the invalid face (issue 3042) is two rules over the same group and input, so it stays beside them -->
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
   mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts. A click-only
@@ -404,6 +404,25 @@
     font-weight: 500;
   }
 
+  /* The invalid face: the group's edge and ground, or, for a vertical stepper that draws no group
+     edge, the input's own, at the size the valid input has. The value keeps its ink. */
+  .fab-stepper:not(.is-vertical):has(> .fab-stepper-input[aria-invalid='true']) {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  /* Subtle falls under 3:1 on the danger ground in one palette, so the glyphs read secondary. */
+  .fab-stepper:not(.is-vertical):has(> .fab-stepper-input[aria-invalid='true'])
+    .fab-stepper-adjunct:not(:disabled, :hover) {
+    color: var(--fab-text-secondary);
+  }
+
+  .fab-stepper.is-vertical .fab-stepper-input[aria-invalid='true'] {
+    box-sizing: border-box;
+    border: 1px solid var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
   /* The dense rung: the 24px targets fill the row with no inner padding and no outset to give back. */
   .fab-stepper.is-size-26:not(.is-vertical) {
     --fab-stepper-fill-height: 26px;
@@ -541,6 +560,13 @@
   /* The unset placeholder is text: muted clears 4.5:1 where the user-agent grey does not. */
   .fab-stepper-input:not(:focus-visible)::placeholder {
     color: var(--fab-text-muted);
+  }
+
+  /* Muted does not clear the danger ground in every palette, so an invalid endpoint or
+     placeholder reads secondary. */
+  .fab-stepper-input[aria-invalid='true'][data-stepper-endpoint]:not(:focus-visible),
+  .fab-stepper-input[aria-invalid='true']:not(:focus-visible)::placeholder {
+    color: var(--fab-text-secondary);
   }
 
   .fab-stepper-input::-webkit-outer-spin-button,

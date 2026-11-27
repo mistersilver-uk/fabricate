@@ -669,11 +669,11 @@
                         </span>
                       </span>
 
-                      <!-- The DC is the archetypal numeric in this row, so the pill takes the mono
-                           face (`is-mono`, tabular figures) when it carries a number. The word-only
-                           kinds stay in the UI face. -->
+                      <!-- A number takes the mono face (`is-mono`, tabular figures); the word-only
+                           kinds stay in the UI face. `tone` is the pill's, never this sheet's. -->
                       <Chip
                         class={`manager-recipe-check is-${check.kind}`}
+                        tone={statusChipTone(check.tone)}
                         mono={check.mono}
                         icon={check.icon}
                         data-recipe-check={check.kind}

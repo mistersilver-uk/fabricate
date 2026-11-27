@@ -718,3 +718,313 @@ describe('iterativeStartOutOfBounds', () => {
     assert.deepEqual(iterativeStartBlockers(issues, recipe), [raised]);
   });
 });
+
+describe('counter and action addresses (#3038)', () => {
+  const ADDRESS_KEYS = ['counterId', 'counterName', 'actionId', 'actionName'];
+  const addressKeysOf = (issue) => ADDRESS_KEYS.filter((key) => Object.hasOwn(issue, key));
+  const raised = (edit, code) =>
+    issuesAfter(edit).filter((issue) => issue.kind === 'recipe' && issue.code === code);
+  const only = (edit, code) => {
+    const issues = raised(edit, code);
+    assert.equal(issues.length, 1, `${code} once: ${issues.length}`);
+    return issues[0];
+  };
+  const SLAG = { id: 'slag', label: 'Slag', limit: 'perRecipe', min: 0, max: 5 };
+  const RUST = { id: 'rust', label: 'Rust', limit: 'perRecipe', min: 0 };
+  /** Library counters `slag` and `rust`, the recipe carrying the ids in `carried`, and one effect `amount`. */
+  const reads =
+    (amount, ...carried) =>
+    ({ library, recipe }) => {
+      library.counters.push(SLAG, RUST);
+      recipe.iterative.counters.push(...carried.map((counterId) => ({ counterId })));
+      library.actions[0].effects[0].amount = amount;
+    };
+
+  it('addresses an unknown Counter Instance, the first of two, as one issue', () => {
+    const edit = ({ recipe }) => {
+      recipe.iterative.counters.push({ counterId: 'rust' }, { counterId: 'slag' });
+    };
+    const issue = only(edit, 'iterativeUnknownCounter');
+    assert.deepEqual([issue.counterId, issue.counterName, issue.stepIndex], ['rust', 'rust', null]);
+    assert.deepEqual(addressKeysOf(issue), ['counterId', 'counterName']);
+  });
+
+  it('keeps the instance when a rule counter of the same code is raised later', () => {
+    const issue = only(({ recipe }) => {
+      recipe.iterative.counters.push({ counterId: 'rust' });
+      step(recipe).success.push({ ...HEAT_AT_TEN, counterId: 'cold' });
+    }, 'iterativeUnknownCounter');
+    assert.equal(issue.counterId, 'rust');
+  });
+
+  it('addresses a rule counter that no instance carries', () => {
+    const issue = only(({ recipe }) => {
+      step(recipe).success.push({ ...HEAT_AT_TEN, counterId: 'cold' });
+    }, 'iterativeUnknownCounter');
+    assert.deepEqual([issue.counterId, issue.counterName], ['cold', 'cold']);
+  });
+
+  it('addresses the first hidden or locked counter that no instance carries, in list order', () => {
+    const hidden = only(({ recipe }) => {
+      Object.assign(step(recipe), {
+        hiddenCounterIds: ['heat', 'cold', 'ash'],
+        lockedCounterIds: ['frost'],
+      });
+    }, 'iterativeUnknownCounter');
+    assert.equal(hidden.counterId, 'cold');
+    const locked = only(({ recipe }) => {
+      Object.assign(step(recipe), {
+        hiddenCounterIds: ['heat'],
+        lockedCounterIds: ['ash', 'cold'],
+      });
+    }, 'iterativeUnknownCounter');
+    assert.equal(locked.counterId, 'ash');
+  });
+
+  it('addresses the first step action id naming no library action, in list order', () => {
+    const issue = only(({ recipe }) => {
+      step(recipe).actions.actionIds = ['stoke', 'quench', 'anneal'];
+    }, 'iterativeUnknownAction');
+    assert.deepEqual(
+      [issue.actionId, issue.actionName, addressKeysOf(issue)],
+      ['quench', 'quench', ['actionId', 'actionName']]
+    );
+  });
+
+  it('addresses a previousAction rule to its first absent id, and a counter rule to its counter', () => {
+    const action = only(({ recipe }) => {
+      step(recipe).failure = [
+        { source: 'previousAction', actionIds: ['stoke', 'quench', 'anneal'] },
+      ];
+    }, 'iterativeUnknownAction');
+    assert.deepEqual([action.actionId, Object.hasOwn(action, 'counterId')], ['quench', false]);
+    const counter = only(({ recipe }) => {
+      step(recipe).failure = [{ ...HEAT_AT_TEN, counterId: 'cold' }];
+    }, 'iterativeUnknownCounter');
+    assert.deepEqual([counter.counterId, Object.hasOwn(counter, 'actionId')], ['cold', false]);
+  });
+
+  it('forwards a produced-when rule address', () => {
+    const counter = only(({ recipe }) => {
+      recipe.resultGroups[0].producedWhen = [
+        { end: 'success', rules: [{ ...HEAT_AT_TEN, counterId: 'cold' }] },
+      ];
+    }, 'iterativeUnknownCounter');
+    assert.equal(counter.counterId, 'cold');
+    const action = only(({ recipe }) => {
+      recipe.resultGroups[0].producedWhen = [
+        { end: 'success', rules: [{ source: 'previousAction', actionIds: ['stoke', 'quench'] }] },
+      ];
+    }, 'iterativeUnknownAction');
+    assert.equal(action.actionId, 'quench');
+  });
+
+  it('addresses the instance fault codes to the instance, named by its label', () => {
+    const cases = {
+      iterativeInvalidNumber: ({ recipe }) => {
+        recipe.iterative.counters[0].start = null;
+      },
+      iterativeBoundsInverted: ({ recipe }) => {
+        Object.assign(recipe.iterative.counters[0], { min: 15, max: 5 });
+      },
+      iterativeStartOutOfBounds: ({ recipe }) => {
+        recipe.iterative.counters[0].start = 25;
+      },
+    };
+    for (const [code, edit] of Object.entries(cases)) {
+      const issue = only(edit, code);
+      assert.deepEqual([issue.counterId, issue.counterName], ['heat', 'Heat'], code);
+    }
+  });
+
+  it('names a blank-labelled counter or action by its id, and trims a padded label', () => {
+    const edit = ({ library, recipe }) => {
+      library.counters[0].label = '  \t';
+      library.actions[0].label = '';
+      recipe.iterative.counters[0].start = null;
+      step(recipe).actions.actionIds = ['stoke', 'quench'];
+    };
+    assert.equal(only(edit, 'iterativeInvalidNumber').counterName, 'heat');
+    assert.equal(only(edit, 'iterativeUnknownAction').actionName, 'quench');
+    const padded = only(({ library, recipe }) => {
+      library.counters[0].label = '  Heat  ';
+      recipe.iterative.counters[0].start = null;
+    }, 'iterativeInvalidNumber');
+    assert.equal(padded.counterName, 'Heat');
+  });
+
+  it('addresses the first rolling allowed action in library order, Only lists included', () => {
+    const rollers = (listed) => (context) => {
+      const { library, recipe } = context;
+      library.actions.push({ ...clone(library.actions[0]), id: 'forge', label: 'Forge' });
+      step(recipe).actions = listed
+        ? { mode: 'only', actionIds: listed }
+        : { mode: 'all', actionIds: [] };
+      return { craftingCheck: { routed: {} } };
+    };
+    const all = only(rollers(null), 'iterativeCheckUnavailable');
+    assert.deepEqual([all.actionId, all.actionName, all.stepIndex], ['stoke', 'Stoke', null]);
+    const reversed = only(rollers(['forge', 'stoke']), 'iterativeCheckUnavailable');
+    assert.equal(reversed.actionId, 'stoke');
+    assert.equal(only(rollers(['forge']), 'iterativeCheckUnavailable').actionId, 'forge');
+  });
+
+  it('addresses the first expression root that no Counter Instance carries', () => {
+    const edit = reads('1d4 + @counter.slag + @counter.rust');
+    const issue = only(edit, 'iterativeUnknownCounter');
+    assert.deepEqual([issue.counterId, issue.counterName], ['slag', 'Slag']);
+  });
+
+  it('addresses the first expression root whose bound is left unset', () => {
+    const edit = reads('1d4 + @max.slag + @max.rust', 'slag', 'rust');
+    const issue = only(edit, 'iterativeExpressionBoundUnset');
+    assert.deepEqual([issue.counterId, issue.counterName], ['rust', 'Rust']);
+  });
+
+  it('carries no address on the issues that name no counter or action', () => {
+    const unaddressed = {
+      iterativeNoCounters: ({ recipe }) => {
+        recipe.iterative.counters = [];
+      },
+      iterativeNoAllowedActions: ({ recipe }) => {
+        step(recipe).actions = { mode: 'only', actionIds: [] };
+      },
+      iterativeNoSuccessRule: ({ recipe }) => {
+        step(recipe).success = [];
+      },
+      iterativeInvalidRule: ({ recipe }) => {
+        step(recipe).failure = [{ source: 'mystery' }];
+      },
+    };
+    for (const [code, edit] of Object.entries(unaddressed)) {
+      const issues = raised(edit, code);
+      assert.ok(issues.length > 0, code);
+      assert.ok(
+        issues.every((issue) => addressKeysOf(issue).length === 0),
+        code
+      );
+    }
+  });
+
+  it('carries no address on a library issue', () => {
+    const issues = issuesAfter(({ library }) => {
+      library.actions[0].costs[0].counterId = 'cold';
+      library.actions[0].availability.rules = [{ source: 'previousAction', actionIds: ['quench'] }];
+    }).filter((issue) => issue.kind === 'system');
+    assert.deepEqual(
+      issues.map((issue) => issue.code),
+      ['iterativeUnknownCounter', 'iterativeUnknownAction']
+    );
+    assert.ok(issues.every((issue) => addressKeysOf(issue).length === 0));
+  });
+
+  it('leaves the issue count, severity and nav as the codes alone give them', () => {
+    const edit = ({ recipe }) => {
+      recipe.iterative.counters.push({ counterId: 'rust' }, { counterId: 'slag' });
+      step(recipe).success.push({ ...HEAT_AT_TEN, counterId: 'cold' });
+      step(recipe).actions.actionIds = ['quench', 'anneal'];
+    };
+    const issues = issuesAfter(edit).filter((issue) => issue.kind === 'recipe');
+    assert.deepEqual(
+      issues.map((issue) => [issue.code, issue.severity, issue.blocks, issue.nav.tab]),
+      [
+        ['iterativeUnknownCounter', 'critical', 'enable', 'overview'],
+        ['iterativeUnknownAction', 'critical', 'enable', 'overview'],
+      ]
+    );
+  });
+
+  it('addresses the first unknown expression root in counter, min, max, target order', () => {
+    for (const [amount, wanted] of [
+      ['@min.b + @counter.a', 'a'],
+      ['@max.c + @min.b', 'b'],
+      ['@target.d + @max.c', 'c'],
+    ]) {
+      const issue = only(reads(amount), 'iterativeUnknownCounter');
+      assert.equal(issue.counterId, wanted, amount);
+    }
+  });
+
+  it('addresses the first unset expression root in min, max, target order', () => {
+    const unset =
+      (amount, ...extra) =>
+      (context) => {
+        const { library, recipe } = context;
+        library.counters.push(
+          { id: 'a', limit: 'perRecipe', max: 5 },
+          { id: 'b', limit: 'perRecipe', min: 0 },
+          { id: 'c', limit: 'perRecipe', min: 0, max: 5 }
+        );
+        recipe.iterative.counters.push(
+          { counterId: 'a', target: 1 },
+          { counterId: 'b', target: 1 },
+          { counterId: 'c' }
+        );
+        library.actions[0].effects[0].amount = amount;
+        for (const edit of extra) edit(context);
+      };
+    for (const [amount, wanted] of [
+      ['@max.b + @min.a', 'a'],
+      ['@target.c + @max.b', 'b'],
+      ['@target.c + @min.a', 'a'],
+    ]) {
+      assert.equal(only(unset(amount), 'iterativeExpressionBoundUnset').counterId, wanted, amount);
+    }
+  });
+
+  it('addresses the first unset root of the first analysis, a start formula before an amount', () => {
+    const both =
+      (startFormula, amount) =>
+      ({ library, recipe }) => {
+        library.counters.push(
+          { id: 'a', limit: 'perRecipe', min: 0 },
+          { id: 'b', limit: 'perRecipe', min: 0 }
+        );
+        recipe.iterative.counters.push(
+          { counterId: 'a', target: 1, startFormula },
+          { counterId: 'b', target: 1 }
+        );
+        library.actions[0].effects[0].amount = amount;
+      };
+    const unset = (edit) => only(edit, 'iterativeExpressionBoundUnset').counterId;
+    assert.equal(unset(both('1', '@max.a')), 'a', 'a lone amount');
+    assert.equal(unset(both('@max.b', '@max.a')), 'b', 'the start formula reads first');
+    assert.equal(unset(both('1', '@max.b + @max.a')), 'b', 'the first root of one amount');
+    const second = ({ library, recipe }) => {
+      both('1', '@max.b')({ library, recipe });
+      library.actions[0].effects.push({
+        ...library.actions[0].effects[0],
+        id: 'cool',
+        amount: '@max.a',
+      });
+    };
+    assert.equal(unset(second), 'b', 'the first analysis of two');
+  });
+
+  it('carries no address when the first offender has no readable id', () => {
+    for (const hiddenCounterIds of [[''], [7]]) {
+      const issue = only(({ recipe }) => {
+        step(recipe).hiddenCounterIds = hiddenCounterIds;
+      }, 'iterativeUnknownCounter');
+      assert.deepEqual(addressKeysOf(issue), [], JSON.stringify(hiddenCounterIds));
+    }
+    const action = only(({ recipe }) => {
+      step(recipe).actions.actionIds = [''];
+    }, 'iterativeUnknownAction');
+    assert.deepEqual(addressKeysOf(action), []);
+  });
+
+  it('names a counter by its trimmed label even when the library arrives unnormalized', () => {
+    const issue = only(({ library, recipe }) => {
+      recipe.iterative.counters[0].start = null;
+      return {
+        iterative: {
+          ...normalizeIterativeLibrary(library),
+          counters: [{ ...normalizeIterativeLibrary(library).counters[0], label: '  Heat  ' }],
+          actions: normalizeIterativeLibrary(library).actions.map((a) => ({ ...a, label: ' \t' })),
+        },
+      };
+    }, 'iterativeInvalidNumber');
+    assert.equal(issue.counterName, 'Heat');
+  });
+});

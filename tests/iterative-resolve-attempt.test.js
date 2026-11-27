@@ -388,6 +388,7 @@ describe('preflight', () => {
       entryId: 'b',
       counterId: 'ember',
       amount: 9,
+      value: 5,
     });
   });
 

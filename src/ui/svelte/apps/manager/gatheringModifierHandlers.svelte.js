@@ -5,6 +5,8 @@
  * weather and biome through a picker and a signed stepper. Every root value is a thunk read at
  * call time; the root runs the five reconcilers from its own `$effect`.
  */
+import { randomBase36 } from '../../../../utils/randomId.js';
+
 import {
   gatheringModifierDisplayValue,
   gatheringModifierSignedValue,
@@ -12,7 +14,6 @@ import {
   gatheringVocabularyValues,
   signedToOperatorValue,
 } from './gatheringDisplay.js';
-import { randomBase36 } from './gatheringDraftHandlers.svelte.js';
 import { mergeAccessors } from './gatheringRouteModel.svelte.js';
 
 const CONDITION_KINDS = Object.freeze(['biome', 'timeOfDay', 'weather']);

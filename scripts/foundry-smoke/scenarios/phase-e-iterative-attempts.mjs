@@ -2,8 +2,9 @@
  * Phase E's Iterative Attempts: an iterative forge whose one-step recipe is started on the GM,
  * then taken three times through `game.fabricate.takeCraftingAction` from a second client joined
  * as the crafter's owning player, one attempt rolling its check. An observer's call is answered
- * with the "needs owner" message, and the player then reads the counters the GM wrote. Asserted
- * in every profile through `page.evaluate` alone; nothing is captured.
+ * with the "needs owner" message, and the player then reads the counters the GM wrote, the Journal
+ * listing's workpiece at the GM's revision, and a stale press refused. Asserted in every profile
+ * through `page.evaluate` alone; nothing is captured.
  */
 
 import { appendAllowedConsoleErrorPatterns } from '../../lib/foundrySmokeSignal.js';
@@ -180,14 +181,16 @@ async function joinAs(page, userLabel) {
  * One `takeCraftingAction` from `clientPage`, answering the reply's facts and the chat messages
  * it added: `posted`, and the last message's roll count and whether this client's user wrote it.
  */
-async function takeFrom(clientPage, { crafterId, runId, actionId }) {
+async function takeFrom(clientPage, { crafterId, runId, actionId, attemptId, expectedRevision }) {
   return await clientPage.evaluate(
-    async ({ crafterId, runId, actionId }) => {
+    async ({ crafterId, runId, actionId, attemptId, expectedRevision }) => {
       const before = game.messages.size;
       const reply = await game.fabricate.takeCraftingAction({
         actorId: crafterId,
         runId,
         actionId,
+        attemptId,
+        expectedRevision,
         interactive: false,
       });
       const last = game.messages.contents.at(-1);
@@ -203,7 +206,26 @@ async function takeFrom(clientPage, { crafterId, runId, actionId }) {
         needsOwner: game.i18n.localize('FABRICATE.App.Journal.Actions.NeedsOwner'),
       };
     },
-    { crafterId, runId, actionId }
+    { crafterId, runId, actionId, attemptId, expectedRevision }
+  );
+}
+
+/** The workpiece the Journal listing offers `page`'s user, freshly read: what D-20 asserts of it. */
+async function readListing(page, { crafterId, runId }) {
+  return await page.evaluate(
+    ({ crafterId, runId }) => {
+      game.fabricate.getCraftingRunManager().invalidateCache?.(crafterId);
+      const listing = game.fabricate.listJournalForActor({ rememberedActorId: crafterId });
+      const run = (listing?.activeRuns ?? []).find((entry) => entry.id === runId);
+      return {
+        found: Boolean(run),
+        iterative: Boolean(run?.iterative),
+        takeAction: run?.actions?.takeAction ?? null,
+        sessions: run?.iterative?.sessions?.length ?? null,
+        runRevision: run?.runRevision ?? null,
+      };
+    },
+    { crafterId, runId }
   );
 }
 
@@ -280,11 +302,49 @@ function assertPosted(actionId, reply) {
   if (!posted) throw new Error(`${actionId} posted ${JSON.stringify(reply)}`);
 }
 
+/** The player's listing offers the workpiece, with its three sessions, at the GM's revision. */
+function assertListing(listing, gm) {
+  const ok =
+    listing.found &&
+    listing.iterative &&
+    listing.takeAction === true &&
+    listing.sessions === ATTEMPTS.length &&
+    listing.runRevision === gm.runRevision;
+  if (!ok) throw new Error(`the player's listing holds ${JSON.stringify(listing)}`);
+}
+
+/** A fresh attempt of the unchecked action at the pre-attempt revision is stale, and changes nothing. */
+async function proveStale(ctx, player, staged, expectedRevision) {
+  const { crafterId } = ctx.shared.cleanup;
+  const before = await readCounters(ctx.page, { ...staged, crafterId });
+  const reply = await withinTime(
+    takeFrom(player.clientPage, {
+      ...staged,
+      crafterId,
+      actionId: 'stoke',
+      attemptId: `smoke-stale-${Date.now()}`,
+      expectedRevision,
+    }),
+    60_000,
+    'the stale attempt never answered'
+  );
+  const after = await readCounters(ctx.page, { ...staged, crafterId });
+  if (
+    reply.success !== false ||
+    reply.reason !== 'stale-run' ||
+    reply.posted !== 0 ||
+    after.runRevision !== before.runRevision
+  ) {
+    throw new Error(`the stale attempt was answered ${JSON.stringify({ reply, before, after })}`);
+  }
+}
+
 async function provePlayerAttempts(ctx, staged) {
   const { crafterId } = ctx.shared.cleanup;
   const player = await joinAs(ctx.page, PLAYER);
   const started = Date.now();
   try {
+    const preAttempt = await readCounters(ctx.page, { ...staged, crafterId });
     const replies = [];
     for (const actionId of ATTEMPTS) {
       const reply = await withinTime(
@@ -305,6 +365,8 @@ async function provePlayerAttempts(ctx, staged) {
     ) {
       throw new Error(`the player reads ${JSON.stringify(seen)} against ${JSON.stringify(gm)}`);
     }
+    assertListing(await readListing(player.clientPage, { ...staged, crafterId }), gm);
+    await proveStale(ctx, player, staged, preAttempt.runRevision);
     const errors = player.errors();
     if (errors.length > 0) throw new Error(`the player client logged: ${errors.join(' | ')}`);
     const wallMs = Date.now() - started;

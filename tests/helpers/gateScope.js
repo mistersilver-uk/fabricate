@@ -51,13 +51,16 @@ export function assertGateArgv(packageJson, scriptKey, expectedArgv) {
  * resolution entirely — see the SonarCloud S4036 note above.
  */
 export function runPrettierCheck(argv, { cwd = repoRoot } = {}) {
+  // A debug run lists every file it resolves, over 1 MB, the default buffer, from a long checkout.
   const result = spawnSync(process.execPath, [PRETTIER_BIN, ...argv], {
     cwd,
     encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
   });
   return {
     status: result.status,
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? '',
+    error: result.error ?? null,
   };
 }

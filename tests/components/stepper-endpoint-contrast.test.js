@@ -48,7 +48,11 @@ test('the endpoint label reads muted at rest and clears 4.5:1 on the outcome row
     STEPPER
   );
   assert.equal(ink, '--fab-text-muted');
-  assert.equal(endpointRules('color').length, 1, 'one endpoint ink rule');
+  assert.deepEqual(
+    endpointRules('color').map((rule) => propertiesOf(rule).get('color')),
+    ['var(--fab-text-muted)', 'var(--fab-text-secondary)'],
+    'the rest ink, then the invalid ink'
+  );
   assert.equal(drawnEndpointInk(), `var(${ink})`, 'the library draws the shipped ink');
   const stack = [
     declaredToken(stepper, '.fab-stepper', 'background', STEPPER),

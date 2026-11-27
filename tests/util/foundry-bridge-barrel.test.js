@@ -20,7 +20,7 @@ const namespaces = await Promise.all(
   concerns.map(async (modulePath) => [modulePath, await load(modulePath)])
 );
 
-test('the barrel names the same 29 symbols as its concern modules, together', () => {
+test('the barrel names the same 30 symbols as its concern modules, together', () => {
   const owned = new Map();
   for (const [modulePath, namespace] of namespaces) {
     for (const name of Object.keys(namespace)) {
@@ -29,7 +29,7 @@ test('the barrel names the same 29 symbols as its concern modules, together', ()
     }
   }
 
-  assert.equal(Object.keys(barrel).length, 29, 'the bridge surface is 29 symbols wide');
+  assert.equal(Object.keys(barrel).length, 30, 'the bridge surface is 30 symbols wide');
   assert.deepEqual(
     Object.keys(barrel).sort(),
     [...owned.keys()].sort(),

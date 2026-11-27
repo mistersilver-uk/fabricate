@@ -45,7 +45,8 @@ const harness = createMountedComponentHarness({
     // A counting check's pool group reads the normalized pool (issue 2006).
     'src/systems/normalize/checkEvaluation.js',
     // The studio's converted option vocabularies (issue 1510).
-    'src/ui/svelte/apps/manager/checks/checksSelectOptions.js'
+    'src/ui/svelte/apps/manager/checks/checksSelectOptions.js',
+    'src/utils/randomId.js'
   ],
   compiledModules: [
     // The shipped segmented primitive.

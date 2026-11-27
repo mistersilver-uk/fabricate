@@ -19,12 +19,15 @@ import {
   ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_EVIDENCE_RAW_MODULES,
   CHECK_TARGET_RAW_MODULES,
+  ITERATIVE_CRAFTING_FACE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  WORKPIECE_VIEW_COMPILED_MODULES,
+  WORKPIECE_VIEW_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -37,6 +40,10 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    // The Workpiece view an active iterative run draws (issue 3011).
+    ...WORKPIECE_VIEW_RAW_MODULES,
+    // The iterative recipe's Crafting-tab face and the formula display the builder delegates to (issue 3011).
+    ...ITERATIVE_CRAFTING_FACE_RAW_MODULES,
     'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1644: a candidate and its slot tile keep focus across a pending command.
     'src/ui/svelte/util/focusWhenEnabled.js',
@@ -56,6 +63,7 @@ const harness = createMountedComponentHarness({
     'src/ui/presenters/resultKindGlyphs.js',
     'src/utils/choiceGroupShape.js',
     'src/systems/currencyProfile.js',
+    'src/utils/randomId.js',
     'src/config/currencyPresets.js',
     // Issue 2005: the check card's roll-under or character-value target line.
     'src/ui/presenters/checkDescriptor.js',
@@ -171,6 +179,7 @@ const harness = createMountedComponentHarness({
     'src/utils/sourceUuid.js',
   ],
   compiledModules: [
+    ...WORKPIECE_VIEW_COMPILED_MODULES,
     // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/PlayerExtensionHost.svelte',
@@ -203,6 +212,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
     'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
+    'src/ui/svelte/apps/crafting/detail/IterativeRecipeBody.svelte',
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageRow.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageBand.svelte',
@@ -896,8 +906,8 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
       off(name, id) {
         handlers.get(name)?.delete(id);
       },
-      callAll(name, payload) {
-        for (const fn of [...(handlers.get(name)?.values() ?? [])]) fn(payload);
+      callAll(name, ...args) {
+        for (const fn of [...(handlers.get(name)?.values() ?? [])]) fn(...args);
       },
       count: (name) => handlers.get(name)?.size ?? 0,
     };
@@ -1041,6 +1051,79 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
     await tick();
     assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
   });
+
+  const runFlag = { flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } } };
+
+  /** Run `body` with a `foundry.utils.hasProperty` the run-flag filter can read a diff through. */
+  async function withHasProperty(body) {
+    const hasProperty = (object, path) =>
+      path.split('.').reduce((node, key) => (node == null ? node : node[key]), object) !== undefined;
+    const prior = Object.getOwnPropertyDescriptor(globalThis, 'foundry');
+    const value = { ...prior?.value, utils: { ...prior?.value?.utils, hasProperty } };
+    Object.defineProperty(globalThis, 'foundry', { value, configurable: true, writable: true });
+    try {
+      await body();
+    } finally {
+      if (prior) Object.defineProperty(globalThis, 'foundry', prior);
+      else delete globalThis.foundry;
+    }
+  }
+
+  it("quietly refreshes the Crafting tab when the selected crafting actor's run flags change", async () =>
+    withHasProperty(async () => {
+      const calls = await mountWithSpies({ getSelectedActorId: () => 'actor-J' });
+      const fire = (actorId, changes) => hooks.callAll('updateActor', { id: actorId }, changes);
+
+      fire('actor-1', runFlag);
+      assert.equal(calls.crafting, 1, 'the selected crafting actor reloads the Crafting tab');
+      assert.equal(calls.journal, 0, 'and not the Journal, which lists another actor');
+      calls.crafting = 0;
+      fire('actor-J', runFlag);
+      assert.equal(calls.journal, 1, 'the Journal reloads for its own actor');
+      assert.equal(calls.crafting, 0, 'and the Crafting tab does not');
+      calls.journal = 0;
+      fire('actor-2', runFlag);
+      fire('actor-1', { system: { attributes: { hp: { value: 3 } } } });
+      assert.equal(calls.crafting + calls.journal, 0, 'another actor or a non-run change is ignored');
+
+      await harness.remount();
+      assert.equal(hooks.count('updateActor'), 0, 'unmount removes both listeners');
+    }));
+
+  it('each store reloads quietly for its OWN selected actor, read when the hook fires', async () =>
+    withHasProperty(async () => {
+      const loads = [];
+      let journalActor = 'actor-J';
+      let craftingActor = 'actor-C';
+      await mountWithSpies({
+        getSelectedActorId: () => journalActor,
+        getSelectedCraftingActorId: () => craftingActor,
+        journal: {
+          navCount: 0,
+          loadedOnce: true,
+          load: (...args) => {
+            loads.push(['journal', ...args]);
+          },
+        },
+        crafting: {
+          load: (...args) => {
+            loads.push(['crafting', ...args]);
+          },
+        },
+      });
+      const fire = (id) => hooks.callAll('updateActor', { id }, runFlag);
+      loads.length = 0;
+      fire('actor-J');
+      assert.deepEqual(loads, [['journal', true]]);
+      loads.length = 0;
+      fire('actor-C');
+      assert.deepEqual(loads, [['crafting', true]]);
+      loads.length = 0;
+      craftingActor = 'actor-Z';
+      journalActor = 'actor-C';
+      fire('actor-C');
+      assert.deepEqual(loads, [['journal', true]], 'selection read at fire time');
+    }));
 
   it('quietly rebuilds the Journal when the run authority reports its refusal lifted', async () => {
     // M25: the listing captures the authority's availability as it builds.

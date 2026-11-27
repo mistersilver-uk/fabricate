@@ -194,10 +194,4 @@
     gap: var(--fab-space-2);
     color: var(--fab-danger-text);
   }
-
-  /* Edge-marks the stepper the way an invalid formula is marked elsewhere: two selectors deep to
-     reach the stepper's own border, which the plain input never draws. */
-  :global(.manager-task-dc-row .fab-stepper:has(input[aria-invalid='true'])) {
-    border-color: var(--fab-danger-border);
-  }
 </style>

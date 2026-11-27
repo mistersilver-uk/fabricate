@@ -28,7 +28,14 @@ function withIronworksRecipes() {
   seedIterativeRecipes(seeded, [], 'authoring');
   return seeded.recipes;
 }
-const SEEDED_RECIPE_IDS = ids(withIronworksRecipes());
+
+/** The recipes a frame reaches once `query.iterative` names the `workpiece` state (issue 3011). */
+function withWorkpieceRecipes() {
+  const seeded = buildLabContent();
+  seedIterativeState(seeded, 'workpiece');
+  return seeded.recipes;
+}
+const SEEDED_RECIPE_IDS = ids([...withIronworksRecipes(), ...withWorkpieceRecipes()]);
 
 /** The fixture collection each id-bearing attribute addresses. */
 const COLLECTION_BY_ATTRIBUTE = Object.freeze({

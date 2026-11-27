@@ -90,6 +90,22 @@ describe('RecipeBrowser mounted behavior', () => {
     );
   });
 
+  it('3011: states no status on the row of a recipe whose workpiece is in progress', async () => {
+    const recipes = [
+      recipe({ id: 'r1', name: 'Forge a Longsword', browseStatus: 'missingMaterials', inProgress: true }),
+    ];
+    const target = await harness.mount({ recipes, totalCount: recipes.length });
+    const row = target.querySelector('[data-recipe-id="r1"]');
+    assert.ok(!row.classList.contains('is-uncraftable'), 'no danger tone');
+    assert.ok(!row.querySelector('.crafting-recipe-row-pip'), 'no pip');
+    assert.ok(!row.querySelector('.crafting-recipe-row-thumb-scrim'), 'no scrim');
+    assert.ok(!row.querySelector('[data-crafting-status]'), 'no status chip');
+    assert.equal(
+      row.querySelector('.crafting-recipe-row-main').getAttribute('aria-label'),
+      'Forge a Longsword, FABRICATE.App.Crafting.Iterative.InProgressBare'
+    );
+  });
+
   it('calls out an uncraftable row with the error tint and a thumbnail pip (no meta badge)', async () => {
     const recipes = [
       recipe({ id: 'r1', name: 'Healing Potion' }),

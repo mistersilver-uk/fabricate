@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { measureImporters } from '../../scripts/lib/componentImporters.js';
 import { readStylesheet } from '../../scripts/lib/stylesheetSource.js';
 import { JOURNAL_RUN_REASON_KEYS } from '../../src/ui/svelte/util/journalRunReasons.js';
 import { calledName, parseModule, walkNodes } from '../helpers/moduleAst.js';
@@ -285,6 +286,11 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
 describe('Journal global CSS treatments', () => {
   it('delegates primary controls to RunActionBar and retires the unused Journal button skin', () => {
     assert.ok(actionsSource.includes('<RunActionBar'), 'the shared primitive owns action chrome');
+    // Issue 3011: the Workpiece view's begin and cancel are the same bar, so it keeps ONE caller.
+    const graph = measureImporters(resolve(__dirname, '../..'));
+    assert.deepEqual(graph.importersOf('src/ui/svelte/components/RunActionBar.svelte'), [
+      'src/ui/svelte/apps/journal/ActionsPanel.svelte',
+    ]);
     assert.ok(!cssSource.includes('.fabricate-app-primary-button'), 'no dead primary skin remains');
   });
 

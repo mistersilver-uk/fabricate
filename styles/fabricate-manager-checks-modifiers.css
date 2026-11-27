@@ -2234,6 +2234,13 @@
   min-width: 0;
 }
 
+/* A connective title ("When") reads as a joining word, not a heading; the label still grows. */
+.fabricate-rule-row .fabricate-rule-row-label.is-connective {
+  color: var(--fab-text-muted);
+  font-weight: 500;
+  font-size: 0.72rem;
+}
+
 .fabricate-rule-row-line .fabricate-rule-row-remove {
   margin-left: auto;
 }

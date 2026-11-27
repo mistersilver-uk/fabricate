@@ -301,6 +301,50 @@ describe('SvelteFabricateApp shell window', () => {
       ]);
     });
   });
+  it('3011: a run of another actor than the Journal lists switches the Journal to it first', async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const app = Object.create(SvelteFabricateApp.prototype);
+      const services = app._buildServices();
+      const calls = [];
+      let journalActor = 'actor-gatherer';
+      services.getSelectedActorId = () => journalActor;
+      services.actorBar = {
+        selectScopedActor: (id) => {
+          calls.push(['actor', id]);
+          journalActor = id;
+        },
+      };
+      services.journal = {
+        load: async (quiet) => {
+          calls.push(['load', quiet, journalActor]);
+        },
+        select: (...args) => {
+          calls.push(['select', ...args]);
+        },
+      };
+      app._selectTab = (tab) => {
+        calls.push(['tab', tab]);
+      };
+      await services.navigateToJournalRun('run-7', 'actor-crafter');
+      assert.deepEqual(calls, [
+        ['actor', 'actor-crafter'],
+        ['load', true, 'actor-crafter'],
+        ['select', 'run-7', 'crafting'],
+        ['tab', 'journal'],
+      ]);
+      calls.length = 0;
+      await services.navigateToJournalRun('run-8', 'actor-crafter');
+      assert.deepEqual(
+        calls,
+        [
+          ['select', 'run-8', 'crafting'],
+          ['tab', 'journal'],
+        ],
+        'the Journal already lists that actor, so nothing reloads'
+      );
+    });
+  });
   // Issue 2048: the listing and the attempt must carry the SAME interactable ref, read per call,
   // so a scoped listing shows and gates on the pool the attempt decrements, and a re-show or close
   // never leaves a stale scope behind for the next refresh.

@@ -38,11 +38,13 @@ The crafting progress reading MUST NOT be conditioned on that gate: a run whose 
 A countdown MUST NOT be shown for a stage with no deadline, because the matured-wait wording would then describe a clock that has not started.
 A run with fewer than two stages renders no rail: gathering and salvage project no steps at all, and a lone track on a single-stage craft asserts a 0% where progress has no meaning.
 The rail's accessible value MUST state what its tracks DRAW — completed stages over total where it is the stage rail, the clock fraction where a gate runs — never a clock fraction of zero beside filled tracks.
+An iterative workpiece's rail reads its per-step progress, the focus step filled toward the goal it works toward whether or not a gate runs; its step line counts completed sessions, and it reads `Ready` while an action can be taken.
 - Active status pills reflect the projection's `derivedStatus`, with pause taking precedence over time-gate readiness (see `data-models/spec.md`).
 The player-facing badge vocabulary is `Ready`, `In progress` and `Paused`: `waiting` and `inProgress` present as ONE badge, `In progress`, with one word, one tone and one glyph, because an unpaused active craft is in progress whether it is counting world time down or sitting between stages.
 `derivedStatus` keeps both values, because the projection still distinguishes where the clock is; what merges is what the player is shown.
 The distinction a player can act on is carried BESIDE the badge by the attention vocabulary and BENEATH it by the progress rail, never by the badge itself.
 Finished rows MUST show a labeled right-side outcome icon instead of an aggregate result quantity or below-title status chip.
+An iterative record's row adds its session count after its finish time.
 Succeeded, failed and cancelled remain distinct; absent or unrecognized terminal status shows localized Outcome unknown, and settlement or recovery evidence takes precedence over a terminal success face.
 - The layout has a browse zone and a selected-detail zone.
 Active and Finished lists scroll independently, with their sort controls and pagers outside the scrolling bodies; the detail scrolls independently.
@@ -113,12 +115,15 @@ Future input previews MUST enumerate every entitled authored requirement kind, o
 Future output copy MUST identify a future-stage preview rather than the current stage.
 Past stages use recorded checks and routes; future choices open only when the stage becomes current.
 
+An active iterative run uses the Workpiece composition instead (_Iterative workpieces_), with no TIME/CHECK pair, countdown or yield preview, and a step boundary's verdict beside its begin control states what starting the next step takes.
+
 #### Waiting on the player rather than on the clock
 
 An unstarted stage has no countdown, so its run status alone reads the same whether it needs a choice, needs stock or needs nothing.
 A run whose current stage cannot proceed until the viewer chooses (`awaitingChoice`, see `data-models/spec.md`) MUST therefore be distinguishable at a glance on the Active list row, on the opened run's header, and in the run's single state notice.
 So MUST a stage that is waiting only for the player to BEGIN it: it owes nothing and is refused by nothing, so under the merged badge it otherwise reads exactly like a run counting world time down, while the act it needs is an irreversible click.
 That signal is reported from the projection's own begin predicate (`actions.atStageStart` with `actions.beginStep`), so it can never invite a click the command refuses, and it is ranked UNDER the blocked states, because a stage that cannot be begun must not advertise that it can be.
+At an iterative step boundary that member reads "Step done" beside "In progress" instead, because the step has ended and the workpiece has not; it still reads so where the next step cannot be begun for a reason no acquisition member names.
 That signal is carried BESIDE the run's status rather than in place of it, because what the clock is doing and what the player owes are two different facts.
 Waiting on a choice MUST read as guidance and MUST NOT raise a refusal: an unbegun stage is ordinary play, exactly as `stageNotStarted` is.
 Waiting on MATERIALS MUST read differently from waiting on a choice on every one of those surfaces, because one is fixed by choosing and the other by acquiring.
@@ -134,6 +139,75 @@ The bolt speaks for the current stage only, because a later stage can still carr
 Gathering runs are out of scope for the bolt in this slice and never carry it, although versioned gathering may also complete automatically.
 The bolt is a glyph alone, so it MUST carry `role="img"` and one localized name, "Finishes this stage as time passes", as both its accessible name and its tooltip, and the row's own accessible name MUST include it.
 
+#### Iterative workpieces
+
+An iterative run (`resolution-modes/spec.md` _Iterative Mode_) is worked one Iterative Attempt at a time, so it MUST NOT offer execution, pause, resume or the completion preference.
+It offers `takeAction` while the run is mutable, current and unpaused and its focus step has begun, has matured and is readable with no step end.
+Every unbegun iterative step is at its own start, its begin control is offered where no stage blocker refuses it, and neither the start nor an attempt reads the viewer's entitlement.
+A begun step reports no stage blocker, because its stage has already spent what it needed; the authority still refuses an attempt a lost Tool or a changed workpiece would break.
+Each Crafting Action the focus step allows is a card judged by preflight against the drawn state, and the authority, not the card, decides the attempt.
+The run reads "Ready" only while an attempt can be taken and a card is enabled, and its list step line counts the focus step's completed sessions.
+The header's mode reads "Iterative", except on a redacted run, which shows no mode label.
+
+##### Hidden counters
+
+A viewer who is not a GM MUST see no hidden counter of the step a surface describes: a counter instance marked not visible and the step's own hidden counters are dropped from every card, chip, ledger, table row, rule, route, caption, notice and verdict, with their ids, labels and values.
+A requirement on a hidden counter reads "Its requirements aren’t met yet", a short cost on one reads "The workpiece can’t cover this yet" and never "No cost", and a hazard naming one is not listed.
+The pane states how many counters are hidden.
+A GM sees every counter, the hidden ones marked "Hidden from players", and no hidden count.
+The run's persisted data is never filtered, and no copy promises secrecy.
+A closed record takes its hidden counters from the live recipe, and one whose recipe no longer resolves shows a viewer who is not a GM no counters.
+
+##### Iterative redaction
+
+A redacted iterative run hides its recipe and step names, routes, goal and yields, and keeps its cards, counters, sessions and begin control under the snapshot's library labels.
+Its steps and verdicts read "Step N", and every check it records reads "Rolled privately by the GM".
+
+##### Taking an Iterative Attempt
+
+Pressing an enabled card sends one `takeAction` command at the revision the card was drawn from, with a fresh attempt id from the host's id service (`foundry.utils.randomID`, never `crypto.randomUUID`, which needs a secure context).
+A press holds the Journal's one busy key until the command's reply and the reload it causes have settled, so no other command runs while it saves.
+An absent or unusable id service sends nothing and says so.
+A press is never retried by a Retry control: a refusal and a stale reply state what happened in the pane's own notice, and only starting a step keeps the shipped command error.
+A cancelled roll prompt changes nothing and says nothing.
+
+A command that times out, or throws, has an unknown outcome and MUST NOT be stated as refused or as spending nothing.
+The pane says the outcome is not yet known and keeps the press, and pressing the same card again at the same revision resends the same attempt id, which the authority answers from the run's log without paying twice.
+A later load whose log holds the attempt shows its result, and a later load at a newer revision without it states that the workpiece changed elsewhere; a load that no longer lists the run drops the press.
+Another card, or a changed revision, is a new press with a new id.
+
+A stale refusal reloads the workpiece, names each action another window took after the state the press was drawn from, and marks those entries "(other window)" in Sessions.
+Sessions marks an entry "(other window)" when its attempt number is past the one this window first saw for the step, not the one a press was drawn from, and its id is not one this window minted.
+A committed press is worded from the reloaded session row, never from the reply, so a hidden counter never reaches the pane.
+When the reloaded revision is still below the reply's, the cards stay disabled until one further reload, and are released even if the revision stays low or the run is no longer listed.
+A press that ends a step keeps its verdict for the rest of the window, worded from the counters the viewer may see.
+
+A refused press reads the reply's own message, else a sentence naming the counter, cost or requirement it concerns when the viewer may see it, else the mapped sentence for its reason; each states that nothing was spent and the session was not counted, unless additional dice were bought.
+A check that cannot roll states that nothing happened and who to ask; an effect whose dice cannot roll states which.
+
+##### The Workpiece view
+
+An active iterative run's detail MUST show, in order: its header, which adds the focus step ("Step N of M") and its next session ("Session N next") or its session count; one notice, or "Each session’s result shows here." while none applies; per-step progress, with the goal the focus step works toward while it is worked; the step browser, when there is more than one step; the viewed step's card; Sessions; This run; and guidance.
+The live step's card shows the counters the viewer may see, each against its scale with its route thresholds marked and one caption; the step's results in authored order, with the one the rules select now marked "Now" and none once the step ends; and one card per allowed Crafting Action.
+The workpiece caption states what the step started with, how many counters are hidden, and whether the values are saved or saving.
+A past or future step's card is frozen: what it consumed and produced, or will consume and produce, the tools it used or needs, its time, check and rules, and how it ended or what it starts with.
+A single step draws no browser and no number, and a redacted run draws no results, step name, sub-line or browser; its progress still reads the goal's counter and threshold, which its counter card already shows.
+
+A card commits on press, so no card is a primary and the pane offers neither a primary nor a pause while a step is worked; at a step's successful end with a later step, "Start step N" is its only primary.
+A card names its action, whether it rolls the check, what it does and each cost and hazard it applies whatever its check gives, else "No cost" unless its setup needs the GM, and states the first of these that applies, in the authority's preflight order: it is saving; the step has ended; its time has not passed ("Waiting until" the world time); its setup needs the GM; its unmet requirements; a cost the workpiece cannot pay; a hazard that already holds; whether it rolls the check.
+A cost whose formula cannot be read is a setup fault found while pricing, so it is named only once the requirements are met.
+While an Iterative Attempt saves, the pressed card is busy, every other card and the cancel control are disabled, and the pane states which session is saving; once it settles, focus returns to the pressed card while it is enabled, else to the begin control, else to the first enabled card, and a step's start settles the same way.
+A committed attempt's notice carries what it checked, paid and changed, each as a chip, and a step's verdict carries what it gives.
+Sessions lists the focus step's Iterative Attempts newest first, five a page with the pager shown past five, marks another window's entries "(other window)", returns to the first page on a new session or a change of run or step, and states how many earlier attempts are not listed.
+Cancelling states, by the refund setting and the step count, whether the current step's inputs are returned, and with refunds on that its progress is lost.
+
+##### Iterative notice precedence
+
+The run detail shows at most one state notice, ranked: recovery, unsupported version, any other blocker (active GM required included), the Iterative Attempt notice, then the shipped reward, choice and paused notices.
+The Iterative Attempt notice is the first that applies of: saving, outcome unknown, stale, refused (a check that cannot roll and a missing id service included), a step boundary's verdict, a step started, the last result, and resume.
+Resume says the workpiece was read fresh when the window opened, and is shown only until the next press or selection.
+It is polite and never blocking, and it keeps one instance from saving through to the result.
+
 #### Ordinary closed history
 
 Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card, except an award pending composition's confirm.
@@ -148,6 +222,10 @@ Each occurrence MUST retain its stage association, recorded quantity and affirma
 Virtual and ambiguous identities MUST remain separate occurrence cards, and omitted tool evidence MUST NOT assert that no tools were used.
 A run closed by GM disposition uses its own closed guidance: a GM closed it without repeating, undoing or refunding anything, and anything marked uncertain stays uncertain.
 It shows its receipts, uncertain ones as uncertain, who closed it as checked or abandoned, and any note, and never lists them under Crafted, Recovered or Brought back.
+
+An iterative record keeps that composition and adds, after its receipts and before This run, its final counters as the viewer may see them (_Hidden counters_), the Sessions of the step it closed on, and inert per-step bars, a failed step's drawn full in danger and read as failed.
+It shows no StageNav, action card or route strip, and draws no Sessions table for a record with no attempts.
+The verdict the Iterative Attempt that ended the run froze, with its rule text and what its set gives, shows on the entry that attempt left selected, and its yields own that entry's produced rows, so Crafted is not drawn a second time beneath it while Materials used stays; a later open has no frozen yields, reads the shipped success or failure text and keeps Crafted, because the archive is never rebuilt into rules.
 
 Multiple attempted stages MUST appear together under How each stage went with per-stage checks and paired actual consumed/produced evidence, without duplicate run-level Crafted or Final check.
 An attempt requires completed/failed status or actual check/effect evidence; a preinitialized next stage or started timestamp alone does not establish execution.

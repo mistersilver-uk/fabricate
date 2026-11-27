@@ -92,7 +92,14 @@
   const address = $derived(multi ? String(stepNumber - 1) : 'single');
 </script>
 
-<div class="manager-iterative-step-config" data-iterative-step-config>
+<!-- `tabindex="-1"`: a counter fault under a step's check takes View to this step. -->
+<div
+  class="manager-iterative-step-config"
+  data-iterative-step-config
+  tabindex="-1"
+  data-keyboard-focus="true"
+  data-validation-target={`iterative-step-${address}`}
+>
   <IterativeStepActions {config} {options} {address} {disabled} {text} {onChange} />
 
   {#if showCounters}

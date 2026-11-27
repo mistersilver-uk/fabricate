@@ -188,6 +188,7 @@ export const RECIPE_SUMMARY_FIELDS = Object.freeze({
     'categoryLabel',
     'id',
     'img',
+    'inProgress',
     'name',
     'redaction',
     'systemId',
@@ -429,6 +430,8 @@ function materialsWithTools({ availability, toolReadySets, snapshot, system }) {
  * @param {object[]|null} [input.toolReadySets] The first step's sets whose Tools are all
  *   available, or `null` when Tools rule nothing out. The cheap rule consults no Tool, so the
  *   caller asks the Tool owner; materials are then judged over these sets alone.
+ * @param {boolean} [input.inProgress] Whether the acting character holds an iterative workpiece
+ *   of the recipe, as the caller read it from that character's active runs. A teaser reads false.
  * @param {boolean} [input.favourite] Whether this viewer has favourited the recipe, from
  *   the player's stored favourites. Ignored for the GM audience.
  * @param {Function|null} [input.localize] `(key) => string`, for `categoryLabel` alone —
@@ -447,6 +450,7 @@ export function projectRecipeSummary({
   checkRefused = false,
   toolReadySets = null,
   favourite = false,
+  inProgress = false,
   localize = null,
 } = {}) {
   const isGM = audience === SUMMARY_AUDIENCE.GM;
@@ -490,6 +494,7 @@ export function projectRecipeSummary({
     // than anything the GM authored (issue 884, the rule; issue 887 shipped the removal of
     // the last borrows).
     img: idOrNull(resolveRecipeImage(recipe ?? {})),
+    inProgress: !redaction.redacted && inProgress === true,
     name: text(recipe?.name),
     redaction,
     systemId: idOrNull(recipe?.craftingSystemId),
