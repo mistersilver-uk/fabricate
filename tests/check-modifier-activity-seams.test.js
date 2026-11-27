@@ -388,7 +388,7 @@ test('the LISTED formula and the ROLLED formula resolve the same scalar, under e
 // `undefined`, `ACTIVITY_CHECK_KEYS.get(undefined)` misses, and the context silently reads NO
 // selection at all — every rule collapses to `addAll` over an empty set.
 defineStructureContract(
-  'the listing builder calls the context builder with an ACTIVITY, not at arity 2',
-  'src/ui/presenters/CraftingListingBuilder.js',
+  'the formula display calls the context builder with an ACTIVITY, not at arity 2',
+  'src/ui/presenters/craftingFormulaDisplay.js',
   { contains: ["buildCheckModifierContext(system, 'crafting', recipe)"] }
 );

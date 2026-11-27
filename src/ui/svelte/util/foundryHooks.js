@@ -246,6 +246,22 @@ export function subscribeActorRunFlagChange(handler, { isRelevantActor } = {}) {
   };
 }
 
+// Each `[handler, selectedActorId]` pair refreshes on a run-flag write by any client to the actor
+// `selectedActorId()` names at fire time; the one cleanup removes them all.
+export function subscribeSelectedActorRunFlagChanges(pairs) {
+  const cleanups = pairs.map(([handler, selectedActorId]) =>
+    subscribeActorRunFlagChange(handler, {
+      isRelevantActor: (actorId) => {
+        const selected = selectedActorId() || null;
+        return Boolean(selected) && String(selected) === String(actorId);
+      },
+    })
+  );
+  return () => {
+    for (const cleanup of cleanups) cleanup();
+  };
+}
+
 /**
  * Subscribe to the current viewer's Journal dismissal refresh signal.
  * Local dismissals name an actor UUID; replicated create/updateSetting signals

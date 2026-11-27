@@ -25,11 +25,19 @@ import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
 import { confirmDialog, isGameMaster, localize, notifyWarn } from './svelte/util/foundryBridge.js';
 
 /** Open run `runId` in the Journal, as a crafting outcome that left a reward to pick does
- *  (issue 1773). */
+ *  (issue 1773). The Journal first switches, quietly, to `actorId` when it lists another actor
+ *  (issue 3011), through the actor bar so the bar and the Journal agree. */
 function journalRunNavigator(services, selectTab) {
-  return (runId) => {
+  const open = (runId) => {
     if (runId) services.journal?.select?.(runId, 'crafting');
     selectTab('journal');
+  };
+  return (runId, actorId = null) => {
+    if (!actorId || String(services.getSelectedActorId?.() || '') === String(actorId)) {
+      return open(runId);
+    }
+    services.actorBar?.selectScopedActor?.(actorId);
+    return Promise.resolve(services.journal?.load?.(true)).then(() => open(runId));
   };
 }
 

@@ -5123,7 +5123,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div>
         <h5>InfoStrip API</h5>
         <ul>
-          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>components/InfoStrip.svelte</code>&rsquo;s <code>$props()</code>: the crafting check card, the gathering detail&rsquo;s stamina pool and the Crafting Action editor&rsquo;s Check card are its three importers.</li>
+          <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>components/InfoStrip.svelte</code>&rsquo;s <code>$props()</code>: the crafting check card, the gathering detail&rsquo;s stamina pool, the Crafting Action editor&rsquo;s Check card and the iterative recipe body&rsquo;s goal and workpiece strips are its four importers.</li>
           <li><b>Props:</b> <b>label</b> the optional kicker at the head of the strip, already localized &middot; <b>badge</b> <code>{label, tone}</code>, a read-only state beside it drawn through the chip primitive in its own tone, which is how the worked example says the check is required &middot; <b>facts</b> <code>[{icon, label?, value, props}]</code>, an ordered list, each a decorative glyph, an optional body-type label, a caller-formatted mono value, and <code>props</code> spread on the fact for its hook and its <code>title</code>.
             Caller-formatted is the contract: a strip is where a GM checks a figure, so the figure arrives already stated and no arithmetic happens here.
             There is no <code>tone</code>: the strip is never tinted, so a state is its badge&rsquo;s, and a fault is a danger notice after the strip.</li>

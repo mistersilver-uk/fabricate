@@ -8,7 +8,8 @@
   An uncraftable recipe (the danger tone — missing materials, or a check that refuses this
   character) is called out more emphatically: the row takes ListRow's danger tone, and the status
   icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a small meta chip.
-  Warning/neutral/info blockers keep the compact meta chip.
+  Warning/neutral/info blockers keep the compact meta chip. A recipe whose workpiece is in progress
+  (`recipe.inProgress`, issue 3011) is mid-work, so the row states no status for it, as its detail does.
 -->
 <script>
   import ListRow from '../../components/ListRow.svelte';
@@ -43,8 +44,11 @@
   // Danger tone === the player cannot craft this (missing materials, or a check that refuses
   // this character). Gate the emphatic error treatment on the tone so the presentation map
   // stays the single source of truth for which statuses read as an error.
-  const uncraftable = $derived(descriptor.tone === 'danger');
-  const statusLabel = $derived(localize(descriptor.labelKey));
+  const working = $derived(recipe?.inProgress === true);
+  const uncraftable = $derived(descriptor.tone === 'danger' && !working);
+  const statusLabel = $derived(
+    localize(working ? 'FABRICATE.App.Crafting.Iterative.InProgressBare' : descriptor.labelKey)
+  );
   const favouriteLabel = $derived(
     localize(
       favourite
@@ -78,7 +82,7 @@
 {#snippet meta()}
   <span class="crafting-recipe-row-meta">
     <span class="crafting-recipe-row-system" title={systemName}>{systemName}</span>
-    {#if !uncraftable}
+    {#if !uncraftable && !working}
       <!-- The row has already said the status in words on the recipe beside it, so this is
            the chip's icon-only face: a square with the label as its accessible NAME rather
            than as a tooltip, which is all the retired badge ever gave it. -->

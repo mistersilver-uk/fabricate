@@ -21,6 +21,7 @@ export {
   subscribeJournalAuthorityRestored,
   subscribeJournalDismissalsChange,
   subscribeSceneChange,
+  subscribeSelectedActorRunFlagChanges,
   subscribeTravelMarkerMove,
   subscribeWorldTime,
 } from './foundryHooks.js';

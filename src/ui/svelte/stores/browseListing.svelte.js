@@ -18,18 +18,25 @@ export function createListingLoad({ fetch, onResult, afterCommit } = {}) {
   let loading = $state(false);
   let error = $state(null);
   let loadedOnce = $state(false);
+  let generation = 0;
 
-  /** Fetch and commit one pass; `quiet` leaves the `loading` flag alone so the list cannot flash. */
+  /**
+   * Fetch and commit one pass; `quiet` leaves the `loading` flag alone so the list cannot flash.
+   * Only the newest pass commits: one a later pass overtook while its fetch was in flight is dropped.
+   */
   async function refresh(quiet = false) {
+    const mine = ++generation;
     if (!quiet) loading = true;
     error = null;
     try {
-      listing = (await fetch()) ?? null;
+      const next = (await fetch()) ?? null;
+      if (mine !== generation) return;
+      listing = next;
       onResult?.();
       loadedOnce = true;
       if (afterCommit) await afterCommit(quiet);
     } catch (error_) {
-      error = error_?.message ?? String(error_);
+      if (mine === generation) error = error_?.message ?? String(error_);
     } finally {
       if (!quiet) loading = false;
     }

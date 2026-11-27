@@ -51,12 +51,17 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'published-standalone-light',
     'published-standalone-in-window',
   ]),
-  // Issue 1648: each run control maps to a state that actually renders it.
+  // Issue 1648: each run control maps to a state that actually renders it. Then (issue 3011) the
+  // Workpiece view's bar, which draws no primary and no pause: its action cards, its step done and
+  // its cancel.
   'src/ui/svelte/components/RunActionBar.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
     'fabricate-journal-lifecycle-paused',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
+    'player-journal-iterative-cards',
+    'player-journal-iterative-step-done',
+    'player-journal-iterative-cancel',
   ]),
   // The journal tab's clock, drawn by `FabricateAppRoot` on every journal frame. This compact-
   // history frame is one that `FabricateAppRoot` selects (issue 1603).
@@ -88,17 +93,22 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-essence-pool',
     'player-crafting-essence-overshoot',
   ]),
+  // Then (issue 3011) the Workpiece view's per-step progress, and the closed record's failed step.
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
+    'player-journal-iterative-idle',
+    'player-journal-iterative-history',
   ]),
   // The data table (issue 1782): the drop rules with a row selected, ranked at the intermediate width,
   // and the crafting detail's tool and output groups, one holding a choice group; then an iterative
-  // recipe's Counters table, with its hint and footer (issue 3010).
+  // recipe's Counters table, with its hint and footer (issue 3010); then the Workpiece view's paged
+  // Sessions, whose pager takes the compact density (issue 3011).
   'src/ui/svelte/components/DataTable.svelte': Object.freeze([
     'manager-gathering-task-drop-modifiers-normal',
     'manager-gathering-task-drops-ranked-narrow',
     'player-crafting-results-choice-group',
     'manager-recipe-edit-iterative',
+    'player-journal-iterative-sessions',
   ]),
   // The typeahead (issue 1782): the limits tab's two 38px fields, and each site's open list; then
   // the specimens that mount it through the published seam (issue 2860).
@@ -137,18 +147,23 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-finished-cancelled',
   ]),
   // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's,
-  // then its specimens mounted through the published seam (issues 2455 and 2837).
+  // then its specimens mounted through the published seam (issues 2455 and 2837), and the failed
+  // step's full danger bar in the closed record (issue 3011).
   'src/ui/svelte/components/StageBars.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
     'manager-published-stage-bars-specimen',
     'manager-published-stage-bars-forms-specimen',
+    'player-journal-iterative-history',
   ]),
-  // The essence pool's per-essence meters, in crafting and on the journal's shared essence stage.
+  // The essence pool's per-essence meters, in crafting and on the journal's shared essence stage;
+  // then (issue 3011) the workpiece's counter meters with their route marks.
   'src/ui/svelte/components/Meter.svelte': Object.freeze([
     'player-crafting-essence-pool',
     'fabricate-journal-lifecycle-essence-shared',
     'manager-published-leaves-specimen',
+    'player-journal-iterative-cards',
+    'player-journal-iterative-routes',
   ]),
   // One chance bar of each scale, and the Checks Studio's odds histogram and one-outcome chart.
   'src/ui/svelte/components/BandedBar.svelte': Object.freeze([
@@ -180,9 +195,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-published-leaves-specimen',
     'manager-published-fill-bar-bands-specimen',
   ]),
+  // Then (issue 3011) the Workpiece view's step browser, on a past and a future step.
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
+    'player-journal-iterative-past-step',
+    'player-journal-iterative-future-step',
   ]),
   // `HistoricalRunDetail` renders this card too, so a change moves the multi-stage history cards as well.
   'src/ui/svelte/components/StageCard.svelte': Object.freeze([

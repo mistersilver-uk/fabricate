@@ -13,6 +13,7 @@
   import IngredientRoutedBody from './detail/IngredientRoutedBody.svelte';
   import RoutedByCheckBody from './detail/RoutedByCheckBody.svelte';
   import ProgressiveBody from './detail/ProgressiveBody.svelte';
+  import IterativeRecipeBody from './detail/IterativeRecipeBody.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
 
   let {
@@ -24,6 +25,8 @@
     onChoose = null,
     onChooseOption = null,
     onCraft = null,
+    // Opens a workpiece in the Journal (issue 3011): `(runId) => void`, the Continue primary's act.
+    onContinue = null,
     // Progressive stage list + player reorder (issue 651). The BODIES dispatcher below
     // passes ONE identical prop set to all four bodies, so these must be declared and
     // forwarded here even though only ProgressiveBody reads them — the other three
@@ -69,14 +72,27 @@
   // hooks refresh, so a stale `false` would remove the pane's only way forward, while a live
   // primary costs at worst one click answered by the sentence the header already shows.
   const canCraft = $derived(craftability?.canCraft === true);
+  // An iterative recipe holding a workpiece continues it in the Journal rather than starting another.
+  const workpiece = $derived(redacted ? null : (recipe?.iterative?.workpiece ?? null));
   const craftLabel = $derived.by(() => {
+    if (workpiece) return localize('FABRICATE.App.Crafting.Button.ContinueInJournal');
     if (redacted || !(canCraft || busy)) return '';
+    if (mode === 'iterative') return localize('FABRICATE.App.Crafting.Button.StartCrafting');
     return localize(
       rollResult
         ? 'FABRICATE.App.Crafting.Button.CraftAnother'
         : 'FABRICATE.App.Crafting.Button.Craft'
     );
   });
+  const primary = $derived(
+    workpiece
+      ? {
+          icon: 'fas fa-book-open',
+          hook: 'data-crafting-continue',
+          act: () => onContinue?.(workpiece.runId),
+        }
+      : { icon: '', hook: '', act: onCraft }
+  );
 
   // Resolve the mode body once. Alchemy is handled by its own tab; an unknown
   // mode falls back to the simple body so a misconfigured system still renders.
@@ -85,6 +101,7 @@
     routedByIngredients: IngredientRoutedBody,
     routedByCheck: RoutedByCheckBody,
     progressive: ProgressiveBody,
+    iterative: IterativeRecipeBody,
   };
   const Body = $derived(BODIES[mode] ?? SimpleRecipeBody);
 </script>
@@ -121,8 +138,10 @@
       {authorityRefusal}
       canCraft={craftability ? canCraft : null}
       {craftLabel}
-      {busy}
-      {onCraft}
+      busy={busy && !workpiece}
+      onCraft={primary.act}
+      primaryIcon={primary.icon}
+      primaryHook={primary.hook}
     />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>

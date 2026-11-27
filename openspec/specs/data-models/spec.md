@@ -5093,6 +5093,7 @@ A summary built with no access result is unredacted and reads as available, whic
 | `availability` | shared | The single cheap-availability rule below, or `null` |
 | `redaction` | shared | `{ redacted, hiddenFields }` derived from the visibility access result |
 | `audience` | shared | The contract the row was built under, `gm` or `player` |
+| `inProgress` | shared | Whether the acting character's first active run of the recipe holds an iterative workpiece, as the caller read it from that character's runs once per pass and only for an iterative recipe. A redacted teaser and a surface with no character read `false` |
 | `locked` | GM only | `Recipe.locked`. Authoring state; it says nothing a player can act on and MUST NOT cross to a player client |
 | `enabled` | GM only | `Recipe.enabled`, absent reading as ON per the model default. Authoring state for the same reason `locked` is, and it would be a constant `true` on a player summary in any case, since the visibility service never surfaces a disabled recipe to one |
 | `favourite` | player only | That viewer's stored favourite recipe ids. It is per-VIEWER, and the GM manager has no viewer to read it for, so a `false` there would assert something untrue rather than something absent |

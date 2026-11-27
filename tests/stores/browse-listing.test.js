@@ -232,6 +232,40 @@ describe('browseListing', () => {
       assert.equal(load.loadedOnce, true);
     });
 
+    it('commits only the newest pass, dropping one a later pass overtook in flight', async () => {
+      const pending = [];
+      const committed = [];
+      const load = createListingLoad({
+        fetch: () =>
+          new Promise((settle, fail) => {
+            pending.push({ settle, fail });
+          }),
+        onResult: () => {
+          committed.push(load.listing?.id);
+        },
+      });
+
+      const stale = load.refresh(true);
+      const fresh = load.refresh(true);
+      pending[1].settle({ id: 'fresh' });
+      await fresh;
+      pending[0].settle({ id: 'stale' });
+      await stale;
+      flushSync();
+
+      assert.deepEqual(load.listing, { id: 'fresh' });
+      assert.deepEqual(committed, ['fresh'], 'the overtaken pass commits nothing');
+
+      const failed = load.refresh(true);
+      const next = load.refresh(true);
+      pending[3].settle({ id: 'next' });
+      await next;
+      pending[2].fail(new Error('stale failure'));
+      await failed;
+      flushSync();
+      assert.equal(load.error, null, 'nor does its failure land');
+    });
+
     it('commits null when the fetch resolves nothing', async () => {
       const load = createListingLoad({ fetch: async () => undefined });
 
