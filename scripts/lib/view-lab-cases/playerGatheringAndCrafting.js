@@ -48,7 +48,7 @@ const iterativeCraftingCase = (entry) =>
       CRAFTING_ITERATIVE,
       PLAYER_DETAIL_HEADER,
       /^src\/ui\/svelte\/stores\/craftingStore/,
-      /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingFormulaDisplay)\.js$/,
+      /^src\/ui\/presenters\/(?:CraftingListingBuilder|summaryProjection)\.js$/,
       /^src\/ui\/presenters\/iterative\/iterativeCraftingFace\.js$/,
     ],
     ...entry,
@@ -93,7 +93,7 @@ const RESULT_SOURCES = [
 const DESCRIPTOR_SOURCES = [
   CRAFTING_SHARED,
   CRAFTING_SIMPLE,
-  /^src\/ui\/presenters\/(?:CraftingListingBuilder|checkDescriptor)\.js$/,
+  /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingFormulaDisplay|checkDescriptor)\.js$/,
 ];
 const CHAT_SOURCES = [
   /^src\/ui\/presenters\/(?:CraftingChatCard|checkDisplay|checkEvidenceRows)\.js$/,
@@ -235,7 +235,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       CRAFTING_SHARED,
       CRAFTING_SIMPLE,
-      /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
+      /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingFormulaDisplay)\.js$/,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
@@ -694,7 +694,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       CRAFTING_SHARED,
       CRAFTING_SIMPLE,
-      /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
+      /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingFormulaDisplay)\.js$/,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
