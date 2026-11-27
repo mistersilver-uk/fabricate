@@ -1,4 +1,4 @@
-<!-- ratchet-exempt(file-size): the dense rung's rules (issue 2841) override the scoped default-rung outset of both parts and the toolbar rung's (issue 2903) the input's, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token -->
+<!-- ratchet-exempt(file-size): the dense rung's rules (issue 2841) override the scoped default-rung outset of both parts and the toolbar rung's (issue 2903) the input's, so they stay in this block and retire with it when the adjunct takes the ::before form or a hit-area token; the invalid face (issue 3042) is two rules over the same group and input, so it stays beside them -->
 <!--
   A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">` styled
   mono, or a spinbutton text input in the formatted mode; the −/+ buttons are adjuncts. A click-only
@@ -402,6 +402,19 @@
     height: 30px;
     font-size: 1.05rem;
     font-weight: 500;
+  }
+
+  /* The invalid face: the group's edge and ground, or, for a vertical stepper that draws no group
+     edge, the input's own, at the size the valid input has. The value keeps its ink. */
+  .fab-stepper:not(.is-vertical):has(> .fab-stepper-input[aria-invalid='true']) {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  .fab-stepper.is-vertical .fab-stepper-input[aria-invalid='true'] {
+    box-sizing: border-box;
+    border: 1px solid var(--fab-danger-border);
+    background: var(--fab-danger-soft);
   }
 
   /* The dense rung: the 24px targets fill the row with no inner padding and no outset to give back. */

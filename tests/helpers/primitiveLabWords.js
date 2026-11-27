@@ -51,6 +51,7 @@ const VALUE_PROP_NAMES = new Set([
   'pageSelectionState',
   'activeTab',
   'groupName',
+  'aria-invalid',
   'valence',
 ]);
 

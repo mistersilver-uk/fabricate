@@ -328,10 +328,4 @@
     gap: var(--fab-space-2);
     color: var(--fab-danger-text);
   }
-
-  /* Edge-marks the Custom… stepper the same way an invalid formula is marked elsewhere: two
-     selectors deep to reach the stepper's own border, which the plain input never draws. */
-  :global(.manager-salvage-dc-controls .fab-stepper:has(input[aria-invalid='true'])) {
-    border-color: var(--fab-danger-border);
-  }
 </style>

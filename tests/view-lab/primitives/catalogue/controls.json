@@ -103,6 +103,45 @@
   },
   {
     "spec": "<Stepper>",
+    "cap": "invalid",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 2,
+      "ariaLabel": "Quantity, invalid",
+      "inputProps": {
+        "aria-invalid": "true"
+      }
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "invalid · vertical",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 4,
+      "orientation": "vertical",
+      "ariaLabel": "Duration in hours, invalid",
+      "inputProps": {
+        "aria-invalid": "true"
+      }
+    }
+  },
+  {
+    "spec": "<Stepper>",
     "cap": "disabled",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",

@@ -30,12 +30,10 @@ import {
 const STEPPER = 'src/ui/svelte/components/Stepper.svelte';
 const STEPPER_CLASSES = new Set(['fab-stepper', 'fab-stepper-input', 'fab-stepper-adjunct']);
 
-/** The twenty-one selectors outside `Stepper.svelte` that name a part of it: sixteen `:not()` exemptions, and five under a pinned ancestor. */
+/** The nineteen selectors outside `Stepper.svelte` that name a part of it: sixteen `:not()` exemptions, and three under a pinned ancestor. */
 const STEPPER_SELECTORS = Object.freeze([
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper)',
   'src/ui/svelte/apps/manager/BulkStagingInset.svelte: :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper .fab-stepper-input)',
-  "src/ui/svelte/apps/manager/component/CheckOverrideField.svelte: :global(.manager-salvage-dc-controls .fab-stepper:has(input[aria-invalid='true']))",
-  "src/ui/svelte/apps/manager/gathering-task/GatheringTaskCheckOverrideCard.svelte: :global(.manager-task-dc-row .fab-stepper:has(input[aria-invalid='true']))",
   // The Manager's text-field baseline and its disabled face, which exclude the field without adding specificity.
   'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]:not(:where(.fab-stepper-input))',
   'styles/fabricate-manager-shell.css: .fabricate-manager input[type="text"]:not(:where(.fab-stepper-input)):disabled',
@@ -59,12 +57,7 @@ const STEPPER_SELECTORS = Object.freeze([
 ]);
 
 /** The classes and hooks under which a rule redraws a stepper of Fabricate's own; no extension target sits in one. */
-const STEPPER_ANCESTORS = new Set([
-  'fab-bulk-inset',
-  'manager-salvage-dc-controls',
-  'manager-task-dc-row',
-  'data-salvage-dc-override',
-]);
+const STEPPER_ANCESTORS = new Set(['fab-bulk-inset', 'data-salvage-dc-override']);
 
 /** The module rules a bare `input` compound reaches a published stepper's number or formatted field through, as written. */
 const BARE_INPUT_RULES = Object.freeze([
@@ -102,8 +95,6 @@ const BARE_INPUT_ANCESTORS = new Set([
   'manager-gathering-task-edit-view',
   'manager-prerequisite-path-input',
   'manager-recipe-option-search',
-  'manager-salvage-dc-controls',
-  'manager-task-dc-row',
   'manager-tool-label-field',
   'manager-tool-prerequisite-row',
   'manager-tools-authority-segments',
@@ -301,7 +292,7 @@ const writtenOf = (census) => census.map(({ written }) => written).sort(byName);
 const reachingOf = (census) => census.filter(({ safe }) => !safe);
 
 describe('the module sheet and every component style against the published Stepper', () => {
-  it('names a part of the stepper outside its own file in twenty-one selectors, none of which a published stepper takes', () => {
+  it('names a part of the stepper outside its own file in nineteen selectors, none of which a published stepper takes', () => {
     const census = stepperSelectors(everyStylesheet());
     assert.deepEqual(writtenOf(census), [...STEPPER_SELECTORS].sort(byName));
     assert.deepEqual(
@@ -372,7 +363,7 @@ describe('the stepper census, synthetic', () => {
   for (const selector of [
     '.a input:not(.fab-stepper-input)',
     '.a input:not(:where(.fab-stepper-input))',
-    '.manager-task-dc-row .fab-stepper',
+    '.fab-bulk-inset .fab-stepper',
     '.x [data-salvage-dc-override] .fab-stepper-adjunct',
   ]) {
     it(`admits ${selector}, which a published stepper cannot take`, () => {
@@ -385,7 +376,7 @@ describe('the stepper census, synthetic', () => {
     '.fab-stepper-adjunct',
     '[data-stepper-input]',
     '.a:has(.fab-stepper)',
-    '.fab-stepper .manager-task-dc-row',
+    '.fab-stepper .fab-bulk-inset',
   ]) {
     it(`refuses ${selector}, which nothing keeps off a published stepper`, () => {
       assert.deepEqual(reachingIn(`${selector} { gap: 0 }`), [`sheet.css: ${selector}`]);
