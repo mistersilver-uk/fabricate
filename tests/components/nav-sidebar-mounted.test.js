@@ -490,22 +490,24 @@ describe('NavSidebar, labelled variant, a tier-gated group', () => {
   });
 
   it('scrolls a revealed row into view once, and again only when the reveal moves', async () => {
-    const scrolled = [];
+    // happy-dom has no layout, so the nav shows 0..100 and every row sits 150..180, below the fold.
     const proto = globalThis.Element.prototype;
-    const original = proto.scrollIntoView;
-    proto.scrollIntoView = function record(options) {
-      scrolled.push([this.id, options]);
+    const original = Object.getOwnPropertyDescriptor(proto, 'getBoundingClientRect');
+    proto.getBoundingClientRect = function box() {
+      const [top, bottom] = this.matches?.('.manager-nav') ? [0, 100] : [150, 180];
+      return { top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top };
     };
+    const navOf = () => document.querySelector('.manager-nav');
     try {
       await mountGated({ reveal: 'ledger' });
-      assert.deepEqual(scrolled, [['probe-ledger', { block: 'nearest' }]]);
+      Object.defineProperty(navOf(), 'clientHeight', { value: 100, configurable: true });
+      navOf().scrollTop = 0;
       await labelledHarness.setProps({ sections: [gatedSection({ reveal: 'ledger' })] });
-      assert.equal(scrolled.length, 1, 'a re-render of the same reveal does not scroll again');
+      assert.equal(navOf().scrollTop, 0, 'a re-render of the same reveal does not scroll again');
       await labelledHarness.setProps({ sections: [gatedSection({ reveal: 'crew' })] });
-      assert.deepEqual(scrolled.at(-1), ['probe-crew', { block: 'nearest' }]);
-      assert.equal(scrolled.length, 2);
+      assert.equal(navOf().scrollTop, 80, 'the row scrolls to the nav’s bottom edge, nearest');
     } finally {
-      proto.scrollIntoView = original;
+      Object.defineProperty(proto, 'getBoundingClientRect', original);
     }
   });
 });

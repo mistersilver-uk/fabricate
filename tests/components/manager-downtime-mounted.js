@@ -33,6 +33,34 @@ const DOWNTIME_NAV_CENSUS_BASE = 'the Core preview with its group opened off the
 
 let Component;
 let mounted;
+/** How far the stubbed rows sit below the stubbed nav's bottom edge. */
+const NAV_BELOW_FOLD_PX = 80;
+
+/**
+ * happy-dom has no layout, so give the nav a 0..100 box and the named rows 150..180, below its
+ * fold, and every other row a box inside it. Returns the undo.
+ *
+ * @param {string[]} belowFoldIds
+ * @returns {() => void}
+ */
+function stubNavLayout(belowFoldIds) {
+  const proto = globalThis.Element.prototype;
+  const box = Object.getOwnPropertyDescriptor(proto, 'getBoundingClientRect');
+  const htmlProto = globalThis.HTMLElement.prototype;
+  const height = Object.getOwnPropertyDescriptor(htmlProto, 'clientHeight');
+  proto.getBoundingClientRect = function stubbed() {
+    let [top, bottom] = [10, 40];
+    if (this.matches?.('.manager-nav')) [top, bottom] = [0, 100];
+    else if (belowFoldIds.includes(this.id)) [top, bottom] = [150, 180];
+    return { top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top };
+  };
+  Object.defineProperty(htmlProto, 'clientHeight', { configurable: true, get: () => 100 });
+  return () => {
+    Object.defineProperty(proto, 'getBoundingClientRect', box);
+    Object.defineProperty(htmlProto, 'clientHeight', height);
+  };
+}
+
 let target;
 // The store the most recent `mountManager` built. Exposed so a case can drive a WORLD
 // SETTING CHANGE the way production does — the real `adminStore` republishes `viewState`
@@ -83,7 +111,6 @@ export function registerDowntimeCases() {
     await settleBetweenTests();
     assertNoTitledIconButton(titled);
   });
-
 
   it('opens the read-only World Downtime preview with accessible tabs and a secure CTA', async () => {
     const calls = [];
@@ -669,54 +696,48 @@ export function registerDowntimeCases() {
   // offered no visible screen switcher at all. They stay reachable by scrolling, so this is not
   // stranding; it is one scroll, and Core does it.
   it('scrolls the active Downtime sub-item into view on entering the companion route', async () => {
-    const scrolled = [];
-    const original = globalThis.Element.prototype.scrollIntoView;
-    globalThis.Element.prototype.scrollIntoView = function record(options) {
-      scrolled.push([this.id, options]);
-    };
+    const restore = stubNavLayout(['manager-downtime-nav-ledger', 'manager-downtime-nav-crew']);
     try {
       const registry = createManagerExtensionsRegistry();
       registry.publicApi.registerWorldNavProvider(
         downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
       );
       mountDowntimeManager([], {}, {}, { managerExtensions: registry });
-      assert.deepEqual(scrolled, [], 'nothing is revealed while the GM is on another route');
+      const nav = () => target.querySelector('.manager-nav');
+      assert.equal(nav().scrollTop, 0, 'nothing is revealed while the GM is on another route');
 
       worldNavItem('downtime').click();
       await settleRouteExit();
-      assert.deepEqual(
-        scrolled,
-        [['manager-downtime-nav-ledger', { block: 'nearest' }]],
+      assert.equal(
+        nav().scrollTop,
+        NAV_BELOW_FOLD_PX,
         'entering the route reveals the active sub-item, by the smallest scroll that does it'
       );
 
+      nav().scrollTop = 0;
       target.querySelector('#manager-downtime-nav-crew').click();
       await settleRouteExit();
-      assert.deepEqual(
-        scrolled.at(-1),
-        ['manager-downtime-nav-crew', { block: 'nearest' }],
-        'and switching screen follows the switcher'
-      );
-      // There was an assertion here that a further settle does not re-scroll.
+      assert.equal(nav().scrollTop, NAV_BELOW_FOLD_PX, 'and switching screen follows the switcher');
     } finally {
-      globalThis.Element.prototype.scrollIntoView = original;
+      restore();
     }
   });
 
-  // Core's preview owns the top of its own panel, so it needs no reveal.
-  it('does not scroll the rail on the Core preview route', async () => {
-    const scrolled = [];
-    const original = globalThis.Element.prototype.scrollIntoView;
-    globalThis.Element.prototype.scrollIntoView = function record() {
-      scrolled.push(this.id);
-    };
+  // Every active row is revealed only when it is clipped (issue 3030), so the Core preview's row,
+  // already in view, leaves the rail where it was.
+  it('does not scroll the rail on the Core preview route while its row is in view', async () => {
+    const restore = stubNavLayout([]);
     try {
       mountDowntimeManager([]);
       worldNavItem('downtime').click();
       await settleRouteExit();
-      assert.deepEqual(scrolled, [], 'core-fallback keeps its strip at the top of the panel');
+      assert.equal(
+        target.querySelector('.manager-nav').scrollTop,
+        0,
+        'core-fallback keeps its strip at the top of the panel'
+      );
     } finally {
-      globalThis.Element.prototype.scrollIntoView = original;
+      restore();
     }
   });
 
@@ -2154,7 +2175,9 @@ export function registerDowntimeCases() {
   function accessibleName(node, referenced = false) {
     const ids = node.getAttribute('aria-labelledby')?.trim();
     if (ids && !referenced) {
-      const named = ids.split(/\s+/).map((id) => accessibleName(target.querySelector(`#${id}`), true));
+      const named = ids
+        .split(/\s+/)
+        .map((id) => accessibleName(target.querySelector(`#${id}`), true));
       return named.join(' ').replaceAll(/\s+/g, ' ').trim();
     }
     const own = node.getAttribute('aria-label')?.trim();
@@ -2588,7 +2611,8 @@ export function registerDowntimeCases() {
         await press(openToggle);
         await press(railToggleControl);
       },
-      'an unbadged companion with its group closed': () => mountBadgedDowntimeManager({ badges: {} }),
+      'an unbadged companion with its group closed': () =>
+        mountBadgedDowntimeManager({ badges: {} }),
       'a badged companion with its group open on a collapsed rail': async () => {
         await mountBadgedDowntimeManager();
         await press(openToggle);

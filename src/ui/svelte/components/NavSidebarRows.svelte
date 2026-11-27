@@ -15,7 +15,8 @@
   - A row with no `active` carries exactly its base class; a disabled row or locked chevron is
     described by a visually hidden reason — pinned by `tests/components/nav-sidebar-mounted.test.js`.
   - A `tierGated` row draws the premium padlock after its marks, hidden from assistive technology;
-    a `reveal` row scrolls itself into view, once each time it starts revealing (issue 1213).
+    a `reveal` row, and the active row, scroll themselves into view within the nav, once each time
+    they start revealing (issues 1213, 3030).
 -->
 <script>
   let { entries = [], itemClass = '', groupClasses = {}, childClasses = {} } = $props();
@@ -28,10 +29,28 @@
 
   const reasonId = (domId) => `${domId}-reason`;
 
-  // A stable function, so a row that stays revealed across re-renders is not scrolled again.
+  // Moves the nav's own `scrollTop`, never an ancestor, and only when the row is clipped, so a row
+  // already in view does not scroll (issue 3030).
+  function scrollNavTo(node) {
+    const scroller = node.closest('.manager-nav');
+    if (!scroller) return;
+    const row = node.getBoundingClientRect();
+    const top = scroller.getBoundingClientRect().top + scroller.clientTop;
+    const bottom = top + scroller.clientHeight;
+    if (row.top < top) scroller.scrollTop += row.top - top;
+    else if (row.bottom > bottom) scroller.scrollTop += row.bottom - bottom;
+  }
+
+  // A stable function, so a row that stays revealed across re-renders is not scrolled again. It
+  // checks again when the nav's own height changes (a window resize, a web font swapping in), so
+  // the active row is not left clipped by a nav that shrank after it mounted.
   function revealRow(node) {
-    // happy-dom does not implement it, hence the optional call.
-    node.scrollIntoView?.({ block: 'nearest' });
+    scrollNavTo(node);
+    const scroller = node.closest('.manager-nav');
+    if (!scroller || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => scrollNavTo(node));
+    observer.observe(scroller);
+    return () => observer.disconnect();
   }
 </script>
 
@@ -52,7 +71,7 @@
     aria-describedby={item.disabledReason ? reasonId(item.domId) : item.ariaDescribedBy}
     disabled={item.disabled}
     onclick={item.onSelect}
-    {@attach item.reveal && revealRow}
+    {@attach (item.reveal || item.active) && revealRow}
   >
     <i class={item.icon} aria-hidden="true"></i>
     <span class="manager-nav-label" id={item.labelId}>{item.label}</span>

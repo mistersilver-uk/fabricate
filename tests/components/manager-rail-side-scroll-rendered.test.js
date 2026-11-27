@@ -49,11 +49,11 @@ const STACKED_VIEW = 'systems';
  * @returns {string}
  */
 function railPage(viewAttributes, hostWidth = HOST_WIDTH_PX) {
-  const rows = Array.from(
+  const nav = `<nav class="fabricate-nav manager-nav">${Array.from(
     { length: NAV_ROWS },
     (_, index) =>
       `<button type="button" class="manager-nav-button" data-nav-row="${index}"><span>Row ${index}</span></button>`
-  ).join('');
+  ).join('')}</nav>`;
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${stylesheet}</style>
     <style>html, body { margin: 0; padding: 0; }
@@ -74,7 +74,7 @@ function railPage(viewAttributes, hostWidth = HOST_WIDTH_PX) {
                 <button type="button" class="manager-scope-return"><i class="fas fa-arrow-left-long" aria-hidden="true"></i><span>All crafting systems</span></button>
               </div>
             </section>
-            <nav class="fabricate-nav manager-nav">${rows}</nav>
+            ${nav}
           </aside>
           <main class="manager-main"></main>
         </div>
