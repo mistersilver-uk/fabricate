@@ -212,9 +212,16 @@
 
   const isIterativeCheck = (id) => id === 'iterativeCounters' || id.startsWith('iterativeStep:');
 
+  // In iterative a step before the last may have no result set (`resultGroupRequired`).
+  const ITERATIVE_RESULT_GROUP_LABEL = [
+    'CheckResultGroupIterative',
+    'The last step has at least one result set',
+  ];
+
   function checkLabel(id) {
     if (isIterativeCheck(id)) return iterativeCheckLabel(id);
-    const meta = CHECK_LABELS[id] || [id, id];
+    const iterativeGroup = iterativeReadiness && id === 'hasResultGroup';
+    const meta = iterativeGroup ? ITERATIVE_RESULT_GROUP_LABEL : CHECK_LABELS[id] || [id, id];
     return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
   }
 

@@ -280,3 +280,38 @@ test('RecipeActivationError.message stays a headless English aggregate for conso
   assert.ok(Array.isArray(err.activationIssues));
   assert.equal(err.recipeName, 'Mana Potion');
 });
+
+test('iterativeNotReady localizes through the shipped key in the toast and the flash', async () => {
+  const { readFileSync } = await import('node:fs');
+  const lang = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
+  const shipped = lang.FABRICATE.Admin.Manager.RecipeActivation.IssueIterativeNotReady;
+  assert.equal(shipped, RECIPE_ACTIVATION_ISSUE_LABELS.iterativeNotReady[1]);
+  const { iterativeActivationIssues } =
+    await import('../src/systems/iterative/iterativeCraftGate.js');
+  const [issue] = iterativeActivationIssues(
+    { resolutionMode: 'iterative', iterative: { version: 1, counters: [], actions: [] } },
+    { id: 'r-nail', name: 'Bent Nail', ingredientSets: [], resultGroups: [] }
+  );
+  const localizeFn = (key, data) => {
+    const templates = {
+      'FABRICATE.Admin.Manager.RecipeActivation.CannotEnable': 'Cannot enable "{name}": {errors}',
+      'FABRICATE.Admin.Manager.RecipeActivation.CannotEnableTitle': 'Cannot enable "{name}"',
+      'FABRICATE.Admin.Manager.RecipeActivation.IssueIterativeNotReady': `Localized: ${shipped}`,
+    };
+    const t = templates[key];
+    return t
+      ? t.replaceAll(/\{(\w+)\}/g, (m, k) => (data?.[k] == null ? m : String(data[k])))
+      : key;
+  };
+  const expected =
+    "Localized: Its iterative setup has 2 blocking issue(s). The recipe's Validation tab lists them.";
+  const error = new RecipeActivationError('Bent Nail', [issue]);
+  assert.equal(
+    localizeRecipeActivationError(error, localizeFn),
+    `Cannot enable "Bent Nail": ${expected}`
+  );
+  assert.deepEqual(localizeRecipeActivationParts(error, localizeFn), {
+    title: 'Cannot enable "Bent Nail"',
+    detail: expected,
+  });
+});

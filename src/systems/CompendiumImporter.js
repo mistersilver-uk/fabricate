@@ -13,6 +13,7 @@ import {
 } from './importReferenceResolver.js';
 import { createImportSummary } from './importSummary.js';
 import { pruneOrphanedRecipes } from './orphanRecipePrune.js';
+import { onlyIterativeNotReady } from './recipeValidation.js';
 import { importModeRefusal } from './resolutionModeAvailability.js';
 import { membershipKey } from './scopedDefinitions.js';
 import {
@@ -336,8 +337,7 @@ export class CompendiumImporter {
       const packSystemId = systemData.id || system.id;
 
       // --- Phase 4: Import recipes ---
-      // Each recipe mutates the in-memory map only (`persist: false`), flushed by ONE `save()`
-      // after the loop; a failed recipe is isolated and earlier successes still persist.
+      // Each recipe writes the map only (`persist: false`) and fails alone; ONE `save()` follows.
       const totalRecipes = recipesData.length;
       let processedRecipes = 0;
       for (const recipeData of recipesData) {
@@ -347,8 +347,7 @@ export class CompendiumImporter {
             recipeData.craftingSystemId === '__SYSTEM_ID__'
               ? system.id
               : recipeData.craftingSystemId || system.id,
-          // ALWAYS re-stamp provenance (issue 775), discarding any inbound `importSource`, so it
-          // self-heals across re-export chains.
+          // Provenance is always re-stamped (issue 775), so it self-heals across re-export chains.
           importSource: { systemId: packSystemId, importedAt: Date.now() },
         };
 
@@ -367,6 +366,8 @@ export class CompendiumImporter {
         }
 
         try {
+          if (onlyIterativeNotReady(this._recipeManager.canActivateRecipe?.(resolved)))
+            resolved.enabled = false;
           if (existing && overwriteExisting) {
             await this._recipeManager.updateRecipe(resolved.id, resolved, {
               notify: false,
@@ -415,9 +416,8 @@ export class CompendiumImporter {
         await this._recipeManager.save?.();
       }
 
-      // ONE bulk flag cleanup after the prune (the `deleteSystem` precedent), naming the ids it
-      // actually pruned (issue 1226): the gate prunes exactly those when the corpus cannot be
-      // attested complete.
+      // ONE bulk flag cleanup after the prune, naming the ids it pruned (issue 1226): the gate
+      // prunes exactly those when the corpus cannot be attested complete.
       if (summary.recipes.pruned > 0) {
         await this._recipeManager.cleanupOrphanedRecipeFlags?.({
           removedRecipeIds: summary.orphans

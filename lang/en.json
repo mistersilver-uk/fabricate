@@ -3032,7 +3032,8 @@
           "IssueIngredientSetEssenceQuantityNamed": "Ingredient set \"{set}\" has an invalid quantity for essence \"{essence}\"",
           "IssueIngredientSetEssenceQuantity": "Ingredient set \"{set}\" has an invalid essence quantity",
           "IssueIngredientSetDisabledEssence": "Ingredient set \"{set}\" requires essence \"{essence}\", which is disabled in this system",
-          "IssueIngredientGroupUnknownTag": "Ingredient group \"{group}\" references unknown tag \"{tag}\""
+          "IssueIngredientGroupUnknownTag": "Ingredient group \"{group}\" references unknown tag \"{tag}\"",
+          "IssueIterativeNotReady": "Its iterative setup has {count} blocking issue(s). The recipe's Validation tab lists them."
         },
         "SystemOverview": {
           "Title": "System overview",
@@ -3924,6 +3925,7 @@
             "CheckName": "Has a name",
             "CheckIngredientSet": "Every step has at least one ingredient set",
             "CheckResultGroup": "Every step has at least one result set",
+            "CheckResultGroupIterative": "The last step has at least one result set",
             "CheckStepsNamed": "Every step is named",
             "CheckNoDuplicateMatches": "No duplicate component or tag matches",
             "CheckNoRequirementOverlap": "No overlapping ingredient requirements",

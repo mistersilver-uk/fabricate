@@ -47,6 +47,14 @@ import { seedIterativeRecipes, seedIterativeState } from '../view-lab/world/labI
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
+// The activation gate the store's row reads, run over the lab content.
+const { Recipe } = await import('../../src/models/Recipe.js');
+const { RecipeActivationError } = await import('../../src/systems/RecipeActivationError.js');
+const { RecipeManager } = await import('../../src/systems/RecipeManager.js');
+const { localizeRecipeActivationError, localizeRecipeActivationParts } =
+  await import('../../src/utils/recipeActivationMessages.js');
+const { installFoundryUtilsEnv } = await import('../helpers/foundryEnv.js');
+
 const RECIPE_RAW_MODULES = [
   // Issue 1506: the one tone map the converted status pills read at a dynamic site.
   ...STATUS_TONE_RAW_MODULES,
@@ -763,19 +771,29 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
   };
 
   /** The lab's authored Ironworks as library rows, each status read through the store's own field. */
-  function ironworksRows() {
+  function ironworksRows(state = 'authoring') {
     const content = buildLabContent();
     seedIterativeState(content, 'populated');
-    seedIterativeRecipes(content, [], 'authoring');
+    seedIterativeRecipes(content, [], state);
     const persisted = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
     const system = { ...persisted, iterative: normalizeIterativeLibrary(persisted.iterative) };
     // The persisted entries: the oracle suite pins the same statuses over the Recipe models.
     const recipes = content.recipes.filter((entry) => entry.craftingSystemId === system.id);
     const context = createIterativeStatusContext(system, recipes);
+    // Activation's own verdict over the lab content, the predicate the store's row reads. A lab
+    // result carries no id, so the model mints one through Foundry's `randomID`.
+    installFoundryUtilsEnv();
+    const activation = new RecipeManager({
+      getCraftingSystemManager: () => ({ getSystem: () => system, getSystems: () => [system] })
+    });
     const rows = recipes.map((recipe) => {
-      // Hinge is the one recipe with no ingredient set anywhere, so activation refuses it.
-      const enableBlocked = !recipe.ingredientSets?.length && !recipe.steps?.length;
-      const row = makeRecipe({ id: recipe.id, name: recipe.name, enableBlocked });
+      const enableBlocked = !activation.canActivateRecipe(new Recipe(recipe)).valid;
+      const row = makeRecipe({
+        id: recipe.id,
+        name: recipe.name,
+        enabled: recipe.enabled,
+        enableBlocked
+      });
       defineIterativeStatus(row, recipe, context);
       return row;
     });
@@ -787,7 +805,7 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
         )
       ])
     );
-    return { rows, statuses };
+    return { rows, statuses, recipes, activation };
   }
 
   it('draws each row’s pill from its status, with Ready withheld while enabling is blocked', async () => {
@@ -802,15 +820,60 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
       ];
       assert.deepEqual(pillsOf(root, row.id), expected, `${row.id} draws its status`);
     }
-    // The oracle's rows, literally, so the agreement above is not vacuous.
-    assert.deepEqual(pillsOf(root, 'iw-r-nail').map((pill) => pill[3]), ['2 blocking']);
-    assert.deepEqual(pillsOf(root, 'iw-r-rivet').map((pill) => pill[3]), ['3 blocking']);
-    assert.deepEqual(pillsOf(root, 'iw-r-ingot').map((pill) => pill[0]), ['iterativeSetup']);
+    // The oracle's rows, literally, so the agreement above is not vacuous: each recipe with an
+    // enable blocker wears the activation pill beside its iterative one.
+    assert.deepEqual(pillsOf(root, 'iw-r-nail').map((pill) => pill[3]), ['Incomplete', '2 blocking']);
+    assert.deepEqual(pillsOf(root, 'iw-r-rivet').map((pill) => pill[3]), ['Incomplete', '3 blocking']);
+    assert.deepEqual(
+      pillsOf(root, 'iw-r-ingot').map((pill) => pill[0]),
+      ['incomplete', 'iterativeSetup']
+    );
+    assert.deepEqual(
+      pillsOf(root, 'iw-r-sword').map((pill) => pill[0]),
+      ['incomplete', 'iterativeSetup']
+    );
     assert.deepEqual(pillsOf(root, 'iw-r-blade').map((pill) => pill[0]), ['iterativeReady']);
     assert.deepEqual(
       pillsOf(root, 'iw-r-hinge').map((pill) => pill[0]),
       ['incomplete'],
       'Hinge is ready by its issues, but activation refuses it, so it wears no Ready'
+    );
+  });
+
+  it('flashes a refused iterative enable with its blocking count, as the capture case draws it', async () => {
+    const { rows, recipes, activation } = ironworksRows('chain');
+    const calls = [];
+    const root = await browser.mount({
+      recipes: rows,
+      showRecipeCategories: false,
+      onToggleEnabled: (id, enabled, options) => {
+        calls.push({ id, enabled, options });
+      }
+    });
+    const viewCase = getCaseById('manager-recipes-iterative-enable-refused');
+    root.querySelector(viewCase.steps.at(-1).selector).click();
+    flushSync();
+    assert.deepEqual([calls[0].id, calls[0].enabled], ['iw-r-nail', true]);
+
+    // The store's refusal path, over the issues activation raises for Nail.
+    const nail = recipes.find((recipe) => recipe.id === 'iw-r-nail');
+    const { issues } = activation.canActivateRecipe(new Recipe(nail));
+    const error = new RecipeActivationError(nail.name, issues);
+    const localize = (key) => key;
+    calls[0].options.onBlocked(
+      localizeRecipeActivationError(error, localize),
+      localizeRecipeActivationParts(error, localize)
+    );
+    flushSync();
+
+    const flash = root.querySelector('[data-recipe-flash]');
+    assert.equal(
+      flash.querySelector('.fab-notice-detail').textContent.trim(),
+      "Its iterative setup has 2 blocking issue(s). The recipe's Validation tab lists them."
+    );
+    assert.ok(
+      Boolean(document.querySelector(viewCase.expectSelector.replace('.fabricate-manager', 'body'))),
+      `the refused-enable frame's selector matched nothing: ${viewCase.expectSelector}`
     );
   });
 

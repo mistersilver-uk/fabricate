@@ -22,6 +22,9 @@ const harness = createMountedComponentHarness({
     'src/config/flags.js',
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+    // …which reads `resultGroupRequired` off the step model and its rule helpers.
+    'src/models/iterativeStepConfig.js',
+    'src/systems/iterative/counterRule.js',
     // …which reads the routed warnings off the routing model (issue 2511).
     'src/ui/svelte/apps/manager/recipe/recipeRoutingModel.js',
     'src/utils/routedOutcomeKeywords.js',
@@ -759,6 +762,53 @@ describe('RecipeValidationTab (mounted)', () => {
         issues: [counterIssue('iterativeBoundsInverted', 'heat', 'Heat')]
       });
       assert.equal(issues[0].focusTarget, 'iterative-counters');
+    });
+
+    it('passes a step before the last with no result set, as the chain capture case asserts', async () => {
+      const chain = {
+        name: 'Chain Link',
+        enabled: true,
+        steps: [
+          { id: 'heat', name: 'Heat the rod', ingredientSets: [{ id: 's1' }], resultGroups: [] },
+          { id: 'close', name: 'Close the link', ingredientSets: [{ id: 's2' }], resultGroups: [{ id: 'g' }] }
+        ]
+      };
+      const chainSteps = [
+        { index: 0, id: 'heat', name: 'Heat the rod' },
+        { index: 1, id: 'close', name: 'Close the link' }
+      ];
+      const target = await harness.mount({
+        recipe: chain,
+        iterativeReadiness: { steps: chainSteps, issues: [] }
+      });
+      const check = target.querySelector(':scope [data-validation-group="results"] [data-check="hasResultGroup"]');
+      assert.equal(check.dataset.satisfied, 'true');
+      assert.equal(
+        check.querySelector('.manager-recipe-val-title').textContent,
+        'The last step has at least one result set'
+      );
+      assert.ok(!target.querySelector('[data-issue="noResultGroup"]'), 'no step is missing a set');
+      const { getCaseById } = await import('../../scripts/lib/viewLabCases.js');
+      const { expectSelector } = getCaseById('manager-recipe-edit-iterative-validation-chain');
+      // The tab's host stands in for the editor's `[data-recipe-tab="validation"]` panel.
+      const local = expectSelector
+        .replace('[data-recipe-tab="validation"]', ':scope')
+        .replace(' [data-recipe-tab="validation"]', '');
+      assert.ok(Boolean(target.querySelector(local)), `the chain frame's selector matched nothing: ${local}`);
+      harness.remount();
+
+      const last = structuredClone(chain);
+      last.steps[1].resultGroups = [];
+      const missing = await harness.mount({
+        recipe: last,
+        iterativeReadiness: { steps: chainSteps, issues: [] }
+      });
+      assert.deepEqual(
+        [...missing.querySelectorAll('[data-issue="noResultGroup"]')].map((row) => row.dataset.check),
+        ['hasResultGroup'],
+        'the last step still needs one'
+      );
+      harness.remount();
     });
 
     it('reads a ready single-step recipe as pass rows with nothing blocking', async () => {

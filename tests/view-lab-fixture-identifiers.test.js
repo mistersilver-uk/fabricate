@@ -115,10 +115,12 @@ function modifierLibraryIds() {
 
 /** The Ironworks recipe ids a frame seeds through `query.iterativeRecipes`, which a step may open. */
 function ironworksRecipeIds() {
-  const seeded = buildLabContent();
-  seedIterativeState(seeded, 'populated');
-  seedIterativeRecipes(seeded, buildLabActors(seeded), 'authoring');
-  return seeded.recipes.map((entry) => entry.id);
+  return Object.keys(LAB_ITERATIVE_RECIPE_STATES).flatMap((state) => {
+    const seeded = buildLabContent();
+    seedIterativeState(seeded, 'populated');
+    seedIterativeRecipes(seeded, buildLabActors(seeded), state);
+    return seeded.recipes.map((entry) => entry.id);
+  });
 }
 const IRONWORKS_RECIPE_IDS = ironworksRecipeIds();
 
@@ -357,6 +359,7 @@ test('every query.iterativeRecipes names a recipe state the lab seeds, beside an
 /** Issue 3010's reachable-state matrix, one case per row, written out by hand. */
 const ITERATIVE_RECIPE_CASE_IDS = Object.freeze([
   'manager-recipes-iterative',
+  'manager-recipes-iterative-enable-refused',
   'manager-recipe-edit-iterative',
   'manager-recipe-edit-iterative-counters-empty',
   'manager-recipe-edit-iterative-counters-no-library',
@@ -383,6 +386,7 @@ const ITERATIVE_RECIPE_CASE_IDS = Object.freeze([
   'manager-recipe-edit-iterative-results-narrow',
   'manager-recipe-edit-iterative-validation',
   'manager-recipe-edit-iterative-validation-ready',
+  'manager-recipe-edit-iterative-validation-chain',
   'manager-recipe-edit-iterative-narrow',
   'manager-iterative-action-edit-in-progress',
 ]);
@@ -446,7 +450,12 @@ test('each iterative recipe state authors the Ironworks recipes once, by id', ()
     const ids = content.recipes
       .filter((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.IRONWORKS)
       .map((entry) => entry.id);
-    assert.deepEqual([...ids].sort(byCodePoint), expectedIds, state);
+    const added = state === 'chain' ? ['iw-r-chain'] : [];
+    assert.deepEqual(
+      [...ids].sort(byCodePoint),
+      [...expectedIds, ...added].sort(byCodePoint),
+      state
+    );
     assert.equal(new Set(content.recipes.map((entry) => entry.id)).size, content.recipes.length);
     const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
     const held = new Set(system.components.map((entry) => entry.id));

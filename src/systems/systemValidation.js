@@ -30,6 +30,7 @@ import {
 import { trimString as trimmed } from '../utils/scalars.js';
 
 import { evaluateIterativeReadiness } from './iterative/iterativeReadiness.js';
+import { isIncompleteByCounts, modeValidationFlags } from './recipeValidation.js';
 import { ResolutionModeService } from './ResolutionModeService.js';
 import { hasActiveCheck } from './salvageCheckUsability.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -85,24 +86,17 @@ function projectRecipe(recipe, system) {
 
 /**
  * A persistable but uncraftable shell under `mode`, per the model's `validate()` and
- * `validateStructure()` when present, else a count-only fallback (the admin store's
- * `_isRecipeIncomplete`).
+ * `validateStructure()` when present, else `isIncompleteByCounts`, as the Recipes library's
+ * `_isRecipeIncomplete` reads it.
  */
 export function isRecipeIncomplete(recipe, raw, mode) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    const injected = { Roll: diceEngine(), progressive: mode === 'progressive' };
+    const injected = { Roll: diceEngine(), ...modeValidationFlags(mode) };
     return (
       recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
     );
   }
-  const steps = asArray(raw?.steps);
-  if (steps.length > 0) {
-    return steps.some(
-      (step) =>
-        asArray(step?.ingredientSets).length === 0 || asArray(step?.resultGroups).length === 0
-    );
-  }
-  return asArray(raw?.ingredientSets).length === 0 || asArray(raw?.resultGroups).length === 0;
+  return isIncompleteByCounts(raw, mode);
 }
 
 /** Headless English per code; the Validation tab localizes by `code`. */
@@ -212,6 +206,7 @@ function collectRecipeIssues(system, recipes, systemComponents) {
       routingProvider,
       routedOutcomeTierOptions,
       progressive: mode === 'progressive',
+      iterativeMode: mode === 'iterative',
     });
     for (const issue of recipeIssues) {
       issues.push(tagRecipeIssue(issue, projected));

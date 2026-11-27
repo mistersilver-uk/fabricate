@@ -10,6 +10,7 @@ import { IngredientSet } from './IngredientSet.js';
 import {
   normalizeRecipeIterative,
   producedWhenEntry,
+  resultGroupRequired,
   stepIterativeEntry,
 } from './iterativeStepConfig.js';
 import { isEmptyArray, isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
@@ -220,10 +221,11 @@ export class Recipe {
   /**
    * Structure plus completeness (the sets and groups a craft needs). Without `Roll`, or under a
    * `progressive` system, whose award drops every formula (`ResolutionModeService`),
-   * `Result.validate` reports nothing about a rolled amount.
+   * `Result.validate` reports nothing about a rolled amount. Under `iterative` a step before the
+   * last may have no result group (`resultGroupRequired`).
    */
-  validate({ Roll, progressive = false } = {}) {
-    return this._validate({ requireComplete: true, Roll: progressive ? null : Roll });
+  validate({ Roll, progressive = false, iterative = false } = {}) {
+    return this._validate({ requireComplete: true, Roll: progressive ? null : Roll, iterative });
   }
 
   /** Structure only, waiving completeness. */
@@ -231,7 +233,7 @@ export class Recipe {
     return this._validate({ requireComplete: false, Roll: progressive ? null : Roll });
   }
 
-  _validate({ requireComplete = true, Roll } = {}) {
+  _validate({ requireComplete = true, Roll, iterative = false } = {}) {
     // Coded issues (issue 595): a stable `code` plus id-free params and a `location` phrase
     // (`Recipe` or `Step "<label>"`), so the UI localizes every failure without ids. An uncoded
     // string passes through as `{ code: null }`.
@@ -248,22 +250,7 @@ export class Recipe {
     }
 
     if (hasSteps) {
-      for (const [stepIndex, step] of this.steps.entries()) {
-        const stepLabel = this._entityLabel(step, stepIndex);
-        if (
-          requireComplete &&
-          (!Array.isArray(step.ingredientSets) || step.ingredientSets.length === 0)
-        ) {
-          issues.push(buildRecipeActivationIssue('stepMissingIngredientSet', { step: stepLabel }));
-        }
-        if (
-          requireComplete &&
-          (!Array.isArray(step.resultGroups) || step.resultGroups.length === 0)
-        ) {
-          issues.push(buildRecipeActivationIssue('stepMissingResultGroup', { step: stepLabel }));
-        }
-        this._validateTimeRequirement(step.timeRequirement, `Step "${stepLabel}"`, issues);
-      }
+      this._validateSteps(issues, { requireComplete, iterative });
     } else {
       this._validateTimeRequirement(this.timeRequirement, 'Recipe', issues);
       for (const [setIndex, ingredientSet] of this.ingredientSets.entries()) {
@@ -334,6 +321,22 @@ export class Recipe {
       errors: issues.map((issue) => issue.message),
       issues,
     };
+  }
+
+  /** Each explicit step's time requirement and, when complete, its sets and the groups it requires. */
+  _validateSteps(issues, { requireComplete, iterative }) {
+    const isEmpty = (list) => !Array.isArray(list) || list.length === 0;
+    for (const [stepIndex, step] of this.steps.entries()) {
+      const stepLabel = this._entityLabel(step, stepIndex);
+      if (requireComplete && isEmpty(step.ingredientSets)) {
+        issues.push(buildRecipeActivationIssue('stepMissingIngredientSet', { step: stepLabel }));
+      }
+      const groupRequired = resultGroupRequired(stepIndex, this.steps.length, iterative);
+      if (requireComplete && groupRequired && isEmpty(step.resultGroups)) {
+        issues.push(buildRecipeActivationIssue('stepMissingResultGroup', { step: stepLabel }));
+      }
+      this._validateTimeRequirement(step.timeRequirement, `Step "${stepLabel}"`, issues);
+    }
   }
 
   /** The authored `name`, else a 1-based position (issue 595). */

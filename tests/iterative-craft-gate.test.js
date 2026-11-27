@@ -81,6 +81,13 @@ const PATHS = {
 };
 
 describe('every craft path refuses an iterative recipe, and only an iterative one', () => {
+  it('words the refusal as where an iterative recipe is worked', () => {
+    assert.equal(
+      ITERATIVE_CRAFT_REFUSAL,
+      'Iterative recipes are worked one action at a time from the Journal.'
+    );
+  });
+
   for (const [path, run] of Object.entries(PATHS)) {
     it(`${path} refuses with nothing spent`, async () => {
       const { probe, result } = await run('iterative');
