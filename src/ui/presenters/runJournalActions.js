@@ -76,8 +76,7 @@ function shippedRunActions({
   // decision, not the ordinary primary — so gating `beginStep` on the player's own
   // unmade choice can never also make the control disappear and hand back an
   // enabled primary that the command refuses.
-  const atStageStart =
-    mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart && entitled;
+  const atStageStart = mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart;
   return {
     execute: legacyExecute || (mutableCurrent && !paused && executableType && readyToExecute),
     pause:
@@ -110,14 +109,12 @@ function shippedRunActions({
 }
 
 /**
- * An iterative run's actions over the shipped ones. Neither the start nor an attempt reads the
- * viewer's entitlement, because redaction hides identity only; a begun step reports no stage
- * blocker, because its stage has already spent what it needed.
+ * An iterative run's actions over the shipped ones. An attempt reads no entitlement, because
+ * redaction hides identity only; a begun step reports no stage blocker, because its stage has
+ * already spent what it needed.
  */
 function iterativeRunActions(actions, facts, args) {
-  const { mutableCurrent, paused, awaitingStageStart, stageBlocker, blockedReason } = args;
-  const atStageStart =
-    mutableCurrent && args.runType === 'crafting' && !paused && awaitingStageStart;
+  const { mutableCurrent, paused, stageBlocker, blockedReason } = args;
   const unsupported = facts.supported ? null : 'version-unsupported';
   const takeAction =
     mutableCurrent &&
@@ -135,8 +132,7 @@ function iterativeRunActions(actions, facts, args) {
     pause: false,
     resume: false,
     setCompletionMode: false,
-    atStageStart,
-    beginStep: atStageStart && stageBlocker === null && facts.supported,
+    beginStep: actions.atStageStart && stageBlocker === null && facts.supported,
     takeAction,
     disabledReason: args.terminal ? actions.disabledReason : disabledReason,
   };

@@ -4475,23 +4475,17 @@ test('3011: a later step is at its own start, offered to begin when nothing bloc
   assert.equal(started.actions.disabledReason, null);
 });
 
-test('3011: a redacted iterative boundary still begins, while a redacted timed stage is unchanged (#3033)', () => {
-  const redacted = iterativeModel('iterative-starting', { hidden: ['iw-r-longsword'] });
-  assert.equal(redacted.redacted, true);
-  assert.deepEqual([redacted.actions.atStageStart, redacted.actions.beginStep], [true, true]);
-  const timed = activeCraftingRun({
-    status: 'inProgress',
-    steps: [
-      { stepId: 's0', stepName: 'Forge', index: 0, status: 'succeeded' },
-      { stepId: 's1', stepName: 'Temper', index: 1, status: 'inProgress' },
-    ],
-  });
-  const actor = { ...ACTOR, isOwner: true };
-  const hidden = makeBuilder({ active: [timed], recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) } })
-    .buildListing({ actor, viewer: PLAYER }).activeRuns[0];
-  assert.equal(hidden.redacted, true);
-  assert.equal(hidden.actions.atStageStart, false, 'the shipped non-iterative gate still reads entitlement');
-  assert.equal(Object.hasOwn(hidden.actions, 'takeAction'), false, 'a non-iterative run gains no key');
+test('3011: a redacted boundary begins judged on its blocker, iterative or not (#3033)', () => {
+  const boundary = (actor) => iterativeModel('iterative-starting', { hidden: ['iw-r-longsword'], actor }).actions;
+  const begin = ({ atStageStart, beginStep, disabledReason }) => [atStageStart, beginStep, disabledReason];
+  assert.equal(iterativeModel('iterative-starting', { hidden: ['iw-r-longsword'] }).redacted, true);
+  assert.deepEqual(begin(boundary(WORKPIECE_ACTOR)), [true, true, 'stageNotStarted'], 'a stocked boundary');
+  assert.deepEqual(begin(boundary({ ...WORKPIECE_ACTOR, items: [] })), [true, false, 'selectionRequired'], 'a shortfall');
+  const shipped = redactedStage([ironRoute()]).actions;
+  assert.deepEqual(begin(shipped), [true, true, 'stageNotStarted'], 'a non-iterative boundary');
+  const short = redactedStage([routeSet('route-gold', 'gold')]).actions;
+  assert.deepEqual(begin(short), [true, false, 'selectionRequired'], 'a non-iterative shortfall');
+  assert.equal(Object.hasOwn(shipped, 'takeAction'), false, 'a non-iterative run gains no key');
 });
 
 test('3011: a begun step reports no stage blocker, while a boundary reports the one that blocks it', () => {
