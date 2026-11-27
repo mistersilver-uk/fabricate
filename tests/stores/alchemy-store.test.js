@@ -461,7 +461,7 @@ describe('alchemyStore', () => {
     assert.ok(calls.setSystem.includes('sys-a'));
   });
 
-  it('a quiet auto-enter interleaved with a loud load leaves loading to the loud pass', async () => {
+  it('a quiet pass a loud load overtook commits nothing, and leaves loading to the loud pass', async () => {
     const pending = [];
     const harness = makeServices({
       alchemySystem: '',
@@ -476,12 +476,13 @@ describe('alchemyStore', () => {
 
     pending[0]();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.equal(pending.length, 3, 'the quiet pass auto-entered the sole discipline');
-    pending[2]();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.equal(store.loading, true, 'the auto-enter inherited the quiet flag of its own pass');
+    assert.equal(pending.length, 2, 'the overtaken quiet pass commits, so auto-enters, nothing');
+    assert.equal(store.loading, true, 'and leaves loading alone');
 
     pending[1]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(pending.length, 3, 'the loud pass auto-entered the sole discipline');
+    pending[2]();
     await Promise.all([quietPass, loudPass]);
     flushSync();
     assert.equal(store.loading, false, 'the loud pass clears loading in its own finally');
