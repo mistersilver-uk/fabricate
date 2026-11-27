@@ -181,6 +181,7 @@ export const PLAYER_SERVICE_KEYS = Object.freeze([
   'localize',
   'navigateToCraftingRecipe',
   'navigateToJournalRun',
+  'newAttemptId',
   'notify',
   'offerReleaseForRefusal',
   'progressiveOrderRevertMessage',
@@ -944,24 +945,26 @@ export function buildPlayerWorld() {
     i18n: { localize: (key) => `[${key}]`, format: (key, data) => `[${key}:${JSON.stringify(data)}]` },
     settings: { get: () => false, set: async () => {} },
   };
+  const foundry = { utils: { randomID: () => 'attemptId000000a' } };
 
-  return { game, journal, record, facade };
+  return { game, foundry, journal, record, facade };
 }
 
 /** Install the player world's globals and return the restore. */
 export function installPlayerWorld(world) {
-  const saved = [
-    ['game', 'game' in globalThis, globalThis.game],
-    ['ui', 'ui' in globalThis, globalThis.ui],
-  ];
-  globalThis.game = world.game;
-  globalThis.ui = {
-    notifications: {
-      info: (message) => world.record('notify.info', message),
-      warn: (message) => world.record('notify.warn', message),
-      error: (message) => world.record('notify.error', message),
+  const installed = {
+    game: world.game,
+    foundry: world.foundry,
+    ui: {
+      notifications: {
+        info: (message) => world.record('notify.info', message),
+        warn: (message) => world.record('notify.warn', message),
+        error: (message) => world.record('notify.error', message),
+      },
     },
   };
+  const saved = Object.keys(installed).map((name) => [name, name in globalThis, globalThis[name]]);
+  for (const [name, value] of Object.entries(installed)) globalThis[name] = value;
   return () => {
     for (const [name, had, value] of saved) {
       if (had) globalThis[name] = value;

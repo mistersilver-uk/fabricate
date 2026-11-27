@@ -110,7 +110,7 @@ function unavailable(reason, extras = {}) {
 
 function createSecureRandomId(webCrypto) {
   return () => {
-    if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID();
+    if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID(); // eslint-disable-line no-restricted-properties -- the secure-token mint; see createSecureRandomId
     if (typeof webCrypto?.getRandomValues !== 'function') {
       throw new TypeError('Secure random ID API unavailable');
     }

@@ -23,6 +23,7 @@ const MODE_LABEL_KEYS = Object.freeze({
   routedByCheck: 'FABRICATE.App.Journal.Mode.RoutedByCheck',
   progressive: 'FABRICATE.App.Journal.Mode.Progressive',
   alchemy: 'FABRICATE.App.Journal.Mode.Alchemy',
+  iterative: 'FABRICATE.App.Journal.Mode.Iterative',
 });
 
 /**

@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
     // …which reads a result choice group's problems through its edits (issue 1773).
     'src/ui/svelte/components/resultGroupEdits.js',
     'src/ui/svelte/util/draftId.js',
+    'src/utils/randomId.js',
     'src/ui/svelte/components/pickerRowKinds.js',
     'src/utils/choiceGroupShape.js',
     'src/utils/rollFormulaRollability.js',

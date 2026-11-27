@@ -25,6 +25,8 @@ import {
   PAGINATION_COMPILED_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  WORKPIECE_VIEW_COMPILED_MODULES,
+  WORKPIECE_VIEW_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 
@@ -37,6 +39,8 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    // The Workpiece view an active iterative run draws (issue 3011).
+    ...WORKPIECE_VIEW_RAW_MODULES,
     'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1644: a candidate and its slot tile keep focus across a pending command.
     'src/ui/svelte/util/focusWhenEnabled.js',
@@ -56,6 +60,7 @@ const harness = createMountedComponentHarness({
     'src/ui/presenters/resultKindGlyphs.js',
     'src/utils/choiceGroupShape.js',
     'src/systems/currencyProfile.js',
+    'src/utils/randomId.js',
     'src/config/currencyPresets.js',
     // Issue 2005: the check card's roll-under or character-value target line.
     'src/ui/presenters/checkDescriptor.js',
@@ -171,6 +176,7 @@ const harness = createMountedComponentHarness({
     'src/utils/sourceUuid.js',
   ],
   compiledModules: [
+    ...WORKPIECE_VIEW_COMPILED_MODULES,
     // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/PlayerExtensionHost.svelte',

@@ -20,6 +20,7 @@
   import Select from '../../../components/Select.svelte';
   import { localizeOr } from '../../../util/localizeOr.js';
   import { interpolate } from './checksCopy.js';
+  import { randomId as newId } from '../../../../../utils/randomId.js';
   import {
     buildPresetTrigger,
     checkTriggerPresets,
@@ -60,11 +61,6 @@
     lowestTierId = null,
     onChange = () => {},
   } = $props();
-
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
-  }
 
   const triggers = $derived(Array.isArray(value?.triggers) ? value.triggers : []);
 

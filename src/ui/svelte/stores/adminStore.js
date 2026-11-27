@@ -1451,11 +1451,7 @@ export function createAdminStore(services) {
   }
 
   function _randomID() {
-    if (typeof services.randomID === 'function') return services.randomID();
-    if (typeof globalThis.foundry?.utils?.randomID === 'function')
-      return globalThis.foundry.utils.randomID();
-    if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
-    return Math.random().toString(36).slice(2, 14);
+    return services.randomID?.() ?? _fallbackRandomID();
   }
 
   function _currentGatheringConfig() {

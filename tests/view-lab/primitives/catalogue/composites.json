@@ -1753,6 +1753,54 @@
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "progress — a failed stage, in danger",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunProgress.svelte",
+    "note": "A finished workpiece's record: the first stage done and the second failed, drawn in danger and read as failed through the shipped key.",
+    "props": {
+      "label": "Progress",
+      "current": 1,
+      "progress": 100,
+      "stages": [
+        {
+          "id": "rough",
+          "name": "Rough out the blade",
+          "status": "done"
+        },
+        {
+          "id": "edge",
+          "name": "Forge the edge",
+          "status": "failed"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
+    "cap": "progress — a note beside the kicker",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunProgress.svelte",
+    "note": "The stage being worked, with the muted note the Workpiece view states its goal in.",
+    "props": {
+      "label": "Progress",
+      "current": 1,
+      "progress": 75,
+      "note": "Step 2: Shape 45 of 60",
+      "stages": [
+        {
+          "id": "rough",
+          "name": "Rough out the blade",
+          "status": "done"
+        },
+        {
+          "id": "edge",
+          "name": "Forge the edge"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<RunProgress> <StageNav> <StageCard>",
     "cap": "stage nav — a five-stage window over a longer run",
     "draws": ":scope > nav",
     "path": "src/ui/svelte/components/StageNav.svelte",
@@ -1807,7 +1855,7 @@
       "positionKey": "FABRICATE.App.Journal.Stage.Position",
       "returnKey": "FABRICATE.App.Journal.Stage.Return"
     },
-    "note": "Wired as `RunDetail` wires its pager: every name and reading is the Journal's own copy. Its numerals and position line ink `--fab-text-muted`, which clears the 4.5:1 floor in all seven themes (issue 2353)."
+    "note": "Wired as `RunDetail` wires its pager: every name and reading is the Journal's own copy. `WorkpieceView` wires it the same way over its step copy, the second importer that makes it a shared primitive (issue 3011). Its numerals and position line ink `--fab-text-muted`, which clears the 4.5:1 floor in all seven themes (issue 2353)."
   },
   {
     "spec": "<RunProgress> <StageNav> <StageCard>",

@@ -14,6 +14,8 @@ import {
 } from '../src/ui/svelte/apps/manager/recipe/setDrafts.js';
 import { newDraftId } from '../src/ui/svelte/util/draftId.js';
 
+import { withInsecureOriginCrypto } from './helpers/insecureOriginCrypto.js';
+
 const sequence = (...ids) => {
   const queue = [...ids];
   return () => queue.shift();
@@ -30,11 +32,13 @@ describe('newDraftId', () => {
     assert.equal(newDraftId(), 'foundry-id');
   });
 
-  it('falls back to a 16-character slice of a UUID off Foundry', () => {
+  it('falls back to 16 base-36 characters off Foundry, also on an insecure origin', async () => {
     Object.assign(globalThis, { foundry: undefined });
-    const id = newDraftId();
-    assert.match(id, /^[0-9a-f]{16}$/);
-    assert.notEqual(newDraftId(), id);
+    await withInsecureOriginCrypto(() => {
+      const id = newDraftId();
+      assert.match(id, /^[a-z0-9]{16}$/);
+      assert.notEqual(newDraftId(), id);
+    });
   });
 });
 

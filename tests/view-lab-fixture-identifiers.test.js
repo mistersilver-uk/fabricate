@@ -40,6 +40,7 @@ import {
   seedIterativeRecipes,
   seedIterativeState,
 } from './view-lab/world/labIterative.js';
+import { isIterativeState } from './view-lab/world/labIterativeRuns.js';
 import {
   JOURNAL_PROTOTYPE_BINDINGS,
   REDACTED_STAGE_STATES,
@@ -203,6 +204,30 @@ const IDENTITY_SOURCES = {
   ),
 };
 
+/** The ids of one collection of the `workpiece` Ironworks, seeded as a frame naming it would. */
+function workpieceIds(collection) {
+  const seeded = buildLabContent();
+  seedIterativeState(seeded, 'workpiece');
+  return seeded[collection].filter((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.IRONWORKS);
+}
+
+/** Every Crafting Action id any seeded iterative library holds, which `data-iterative-action` names. */
+function iterativeActionIds() {
+  return Object.keys(LAB_ITERATIVE_STATES).flatMap((state) => {
+    const seeded = buildLabContent();
+    seedIterativeState(seeded, state);
+    const ironworks = seeded.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
+    return ironworks.iterative.actions.map((entry) => entry.id);
+  });
+}
+
+// Issue 3011: the workbench's recipes join the recipe hooks, and its actions are a hook of their own.
+const WORKPIECE_RECIPE_IDS = workpieceIds('recipes').map((entry) => entry.id);
+for (const hook of ['data-recipe-id', 'data-recipe-edit']) {
+  IDENTITY_SOURCES[hook] = new Set([...IDENTITY_SOURCES[hook], ...WORKPIECE_RECIPE_IDS]);
+}
+IDENTITY_SOURCES['data-iterative-action'] = new Set(iterativeActionIds());
+
 /** Every `key="value"` pair in a selector, in source order. */
 function attributePairs(selector) {
   return [...selector.matchAll(/\[([a-z][\w-]*)\s*=\s*"([^"]*)"\]/g)].map((match) => ({
@@ -298,6 +323,20 @@ test('the lab world holds no iterative system unless a frame asks for one', () =
     assert.equal(ironworks.resolutionMode, 'iterative');
     assert.notEqual(ironworks.name, 'Karrun Forgecraft', 'the lab names its systems apart');
   }
+  // Issue 3011: the workbench's world appends its components and three recipes, to Ironworks alone.
+  const workbench = structuredClone(base);
+  seedIterativeState(workbench, 'workpiece');
+  assert.deepEqual(workbench.components.slice(0, base.components.length), base.components);
+  const appended = workbench.recipes.slice(base.recipes.length);
+  assert.deepEqual(
+    appended.map((entry) => entry.id),
+    ['iw-r-longsword', 'iw-r-spear', 'iw-r-veiled']
+  );
+  assert.ok(appended.every((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.IRONWORKS));
+  assert.ok(
+    workbench.components.slice(base.components.length).every((entry) => entry.id.startsWith('iw-')),
+    'its components are its own'
+  );
 });
 
 test('every query.iterativeRecipes names a recipe state the lab seeds, beside an iterative one', () => {
@@ -425,7 +464,8 @@ test('every iterative case asserts a selector of its own', () => {
   for (const viewCase of VIEW_LAB_CASES) {
     if (!viewCase.query?.iterative) continue;
     assert.equal(typeof viewCase.expectSelector, 'string', `${viewCase.id} asserts no selector`);
-    assert.ok(viewCase.expectView, `${viewCase.id} asserts no view`);
+    // A manager frame names its view; a player frame names its tab (`expectView` is manager-only).
+    assert.ok(viewCase.expectView || viewCase.expectTab, `${viewCase.id} asserts no view`);
     selectors.set(viewCase.expectSelector, [
       ...(selectors.get(viewCase.expectSelector) ?? []),
       viewCase.id,
@@ -610,6 +650,8 @@ function journalFixture(state) {
       mode
     );
   }
+  // The workbench's states read the world they are named for, and throw in any other.
+  if (isIterativeState(state)) seedIterativeState(seeded, 'workpiece');
   const actor = buildLabActors(seeded)[0];
   const recipes = seeded.recipes.map((entry) => new Recipe(entry));
   const containers = buildLabRunStates({

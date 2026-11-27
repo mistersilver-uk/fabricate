@@ -758,6 +758,7 @@
     "localize": "[FABRICATE.Key]",
     "navigateToCraftingRecipe": "<undefined>",
     "navigateToJournalRun": "<undefined>",
+    "newAttemptId": "attemptId000000a",
     "notify": "<undefined>",
     "offerReleaseForRefusal": {
       "recorded": false,

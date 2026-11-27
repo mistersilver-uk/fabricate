@@ -1,5 +1,6 @@
 import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
+import { randomBase36 } from '../utils/randomId.js';
 import {
   laxNumberOrNull,
   normalizeConditionId,
@@ -154,8 +155,7 @@ export class GatheringRichStateService {
     hooks = globalThis.Hooks ?? null,
     evaluateExpression = null,
     secondsPerUnit = null,
-    // Interactable-scoped node seams (issue 302) resolving and writing a scene interactable's
-    // pool without `game.scenes`; absent, every node path uses the environment scope.
+    // Interactable-scoped node seams (issue 302); absent, every node uses the environment scope.
     resolveRegionBehavior = null,
     writeInteractableBehavior = null,
     // GM-routed environment node depletion: the pool lives in the `gatheringEnvironments` world
@@ -1566,7 +1566,7 @@ export class GatheringRichStateService {
 
   _historyEvent(type, data = {}) {
     return {
-      id: `${type}-${this._now()}-${Math.random().toString(36).slice(2)}`,
+      id: `${type}-${this._now()}-${randomBase36(10)}`,
       type,
       worldTime: this._now(),
       ...cloneJson(data),
