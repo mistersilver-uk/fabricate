@@ -1,5 +1,5 @@
 /**
- * The resolution modes the normalizer accepts and a GM may select (`resolution-modes`
+ * The resolution modes the normalizer accepts and every mode write accepts (`resolution-modes`
  * § Iterative Mode Availability), with the legacy aliases and the two refusals.
  */
 import { iterativeLibraryVersionUnsupported } from './normalize/iterativeLibrary.js';

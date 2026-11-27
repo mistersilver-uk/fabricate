@@ -11,6 +11,7 @@ const RESOLUTION_MODE_LABEL_KEYS = {
   routedByCheck: 'FABRICATE.Admin.SystemSettings.ResolutionRoutedByCheck',
   progressive: 'FABRICATE.Admin.SystemSettings.ResolutionProgressive',
   alchemy: 'FABRICATE.Admin.SystemSettings.ResolutionAlchemy',
+  iterative: 'FABRICATE.Admin.SystemSettings.ResolutionIterative',
 };
 
 function _resolutionModeLabel(mode, localize) {
@@ -52,7 +53,8 @@ function _droppedSetsSentence(dropped, localize) {
       return `${esc(recipe)} (${labels})`;
     })
     .join('; ');
-  const count = dropped.length;
+  // One entry per (recipe, step) scope; the count is of recipes.
+  const count = new Set(dropped.map(({ recipe }) => recipe)).size;
   return (
     localize?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeDroppedSets', { count, sets }) ||
     `${count} recipe(s) will keep only their first ingredient set; these ingredient sets will be dropped: ${sets}.`

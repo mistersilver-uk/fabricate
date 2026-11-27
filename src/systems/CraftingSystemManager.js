@@ -1102,8 +1102,12 @@ export class CraftingSystemManager {
       this._assertNoAlchemySignatureCollisions(merged);
     }
 
-    const runs = { runManager: this._getCraftingRunManager(), actors: globalThis.game?.actors };
-    if (resolutionModeChanged) prepareModeChange(merged, fromMode, toMode, runs);
+    if (resolutionModeChanged) {
+      prepareModeChange(merged, fromMode, toMode, {
+        runManager: this._getCraftingRunManager(),
+        actors: globalThis.game?.actors,
+      });
+    }
 
     // Persist first so recipe migration and validation read the new mode.
     const editDomains = this._domainsForSystemEdit(current, merged);
@@ -1128,8 +1132,7 @@ export class CraftingSystemManager {
       );
     }
 
-    // Disclose by name the components whose surplus Simple-mode groups the clamp dropped
-    // (issue 764), since the clamp itself is silent.
+    // Name the components whose surplus Simple-mode groups the silent clamp dropped (issue 764).
     const droppedSalvageComponents = this._detectDroppedSimpleSalvageGroups(mergedInput, merged);
     if (droppedSalvageComponents.length > 0) {
       const names = droppedSalvageComponents.join(', ');

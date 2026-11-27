@@ -31,7 +31,14 @@ export function createCraftingSettingsActions({ services, selectedSystemId, refr
     const options = modeChangeConfirmOptions(summary, nextMode, services.localize);
     if (!(await services.confirmDialog(options))) return false;
 
-    await systemManager.updateSystem(sysId, { resolutionMode: nextMode });
+    // A refused change (an active-run refusal) writes nothing; the GM sees its sentence.
+    try {
+      await systemManager.updateSystem(sysId, { resolutionMode: nextMode });
+    } catch (error) {
+      services.notify?.error?.(error?.message || 'Failed to change the resolution mode');
+      await refresh();
+      return false;
+    }
     await refresh();
     return true;
   }

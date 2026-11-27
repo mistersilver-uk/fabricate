@@ -19,7 +19,8 @@ const PASS_FAIL_CARRIED_FIELDS = Object.freeze([
 
 /**
  * `{ [systemId]: count }` over the active crafting runs of `actors` (world actors), read as
- * cached: it never calls `invalidateCache()`, which drops every write baseline.
+ * cached: it never calls `invalidateCache()`, which drops every write baseline. It does re-record
+ * each actor's baseline, as every `getActiveRuns` reader does.
  */
 export function activeRunCountsBySystem(runManager, actors) {
   const counts = new Map();

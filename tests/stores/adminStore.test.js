@@ -7,6 +7,7 @@ import {
   DEFAULT_GATHERING_TASK_IMG,
 } from '../../src/gatheringImageDefaults.js';
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
+import { modeChangeRunsMessage } from '../../src/systems/manager/resolutionModeChange.js';
 import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 import {
   cloneRoutedCheck,
@@ -1484,6 +1485,43 @@ describe('createAdminStore', () => {
       const { store, calls } = await modeChangeHarness(systems);
       assert.equal(await store.setResolutionMode('iterative'), true);
       assert.deepEqual(calls, { confirm: 0, update: 0 });
+    });
+
+    it('setResolutionMode notifies a refused change its run message, writes nothing and answers false', async () => {
+      const systems = [makeSystem({ id: 'sys1', name: 'Forge', resolutionMode: 'iterative' })];
+      const errors = [];
+      let writes = 0;
+      const services = createMockServices({
+        systems,
+        notify: {
+          info: () => {},
+          warn: () => {},
+          error: (message) => {
+            errors.push(message);
+          },
+        },
+      });
+      const origManager = services.getCraftingSystemManager();
+      const refusal = { reason: 'modeChangeRunsActive', count: 2, direction: 'out' };
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async () => {
+          throw Object.assign(new Error(modeChangeRunsMessage(refusal)), refusal);
+        },
+        save: async () => {
+          writes += 1;
+        },
+      });
+      services._getRecipesMutable().length = 0;
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.setResolutionMode('routedByCheck'), false);
+      assert.deepEqual(errors, [
+        'Blocked until the 2 workpieces in progress are finished or cancelled.',
+      ]);
+      assert.equal(writes, 0);
+      assert.equal(origManager.getSystem('sys1').resolutionMode, 'iterative');
     });
 
     /** The confirm `content` a mode change to `mode` shows, over `recipes` and English copy. */

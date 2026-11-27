@@ -181,7 +181,8 @@ export function summarizeModeChange(recipes, fromMode, toMode, system = {}) {
       actions: out ? arrayOrEmpty(system?.iterative?.actions).length : 0,
     },
     incompleteAfter: 0,
-    multiStepOff: toMode === 'alchemy' && system?.features?.multiStepRecipes === true,
+    multiStepOff:
+      fromMode !== toMode && toMode === 'alchemy' && system?.features?.multiStepRecipes === true,
   };
   const iterativeSystem = { ...system, resolutionMode: 'iterative' };
   for (const recipe of recipes ?? []) {
@@ -237,8 +238,8 @@ function _stepCount(recipe) {
 
 /**
  * Whether the recipe is "1×1" — exactly one ingredient set and one success result group across
- * every scope; the reserved failure group is not counted. A multi-step recipe is never 1×1: each
- * step is its own scope and single-group modes have no steps.
+ * every scope; the reserved failure group is not counted. A recipe with explicit steps is never
+ * 1×1 (issue 429), although `simple` and `progressive` validate a step at a time.
  */
 function _isOneByOne(recipe) {
   if (_stepCount(recipe) > 0) return false;
