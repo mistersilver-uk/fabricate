@@ -673,7 +673,7 @@
                            kinds stay in the UI face. `tone` is the pill's, never this sheet's. -->
                       <Chip
                         class={`manager-recipe-check is-${check.kind}`}
-                        tone={check.tone}
+                        tone={statusChipTone(check.tone)}
                         mono={check.mono}
                         icon={check.icon}
                         data-recipe-check={check.kind}
