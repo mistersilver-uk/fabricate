@@ -791,9 +791,7 @@ describe('RecipeValidationTab (mounted)', () => {
       const { getCaseById } = await import('../../scripts/lib/viewLabCases.js');
       const { expectSelector } = getCaseById('manager-recipe-edit-iterative-validation-chain');
       // The tab's host stands in for the editor's `[data-recipe-tab="validation"]` panel.
-      const local = expectSelector
-        .replace('[data-recipe-tab="validation"]', ':scope')
-        .replace(' [data-recipe-tab="validation"]', '');
+      const local = expectSelector.replace('[data-recipe-tab="validation"]', ':scope');
       assert.ok(Boolean(target.querySelector(local)), `the chain frame's selector matched nothing: ${local}`);
       harness.remount();
 

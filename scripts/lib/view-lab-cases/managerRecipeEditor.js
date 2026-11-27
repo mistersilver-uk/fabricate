@@ -2665,8 +2665,8 @@ export const CASES = Object.freeze([
     recipes: 'chain',
     steps: [{ selector: '#recipe-tab-validation' }, SCROLL_TO(VALIDATION_RESULTS_GROUP)],
     expectSelector:
-      `[data-recipe-tab="validation"]:not(:has([data-issue="noResultGroup"])) ` +
-      `${VALIDATION_RESULTS_GROUP} [data-check="hasResultGroup"][data-satisfied="true"]`,
+      '[data-recipe-tab="validation"]:not(:has([data-issue="noResultGroup"])) ' +
+      '[data-validation-group="results"] [data-check="hasResultGroup"][data-satisfied="true"]',
     sourceMatches: ITERATIVE_VALIDATION_SOURCES,
   }),
   iterativeRecipeCase({
