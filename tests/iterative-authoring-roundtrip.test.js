@@ -8,7 +8,6 @@ const { validateImportData, prepareForImport } =
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
-const { RESOLUTION_MODES } = await import('../src/systems/resolutionModeAvailability.js');
 const { FIXTURE_SYSTEM_ID, normalizeExportEnvelope } =
   await import('./helpers/fullAuthoringFixture.js');
 const { buildIterativeAuthoringFixture, ITERATIVE_MULTI_RECIPE_ID, ITERATIVE_SINGLE_RECIPE_ID } =
@@ -54,7 +53,7 @@ describe('keep-mode round trip of an iterative system', () => {
     assert.equal(authored.system.actions.length, 2);
   });
 
-  it('exports, imports with the full mode set, and exports again unchanged', async () => {
+  it('exports, imports and exports again unchanged', async () => {
     const h = makeHarness(fixture);
     const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
     assert.equal(first.schemaVersion, 6, 'no envelope slice and no schema bump');
@@ -63,7 +62,6 @@ describe('keep-mode round trip of an iterative system', () => {
 
     const summary = await importerFor(h).importFromPackData(prepareForImport(first, 'keep'), {
       overwriteExisting: true,
-      selectableModes: RESOLUTION_MODES,
     });
     assert.equal(summary.system.skipped, false, 'the import overwrote the system');
     assert.equal(summary.recipes.imported, first.recipes.length);
@@ -91,14 +89,6 @@ describe('keep-mode round trip of an iterative system', () => {
     };
     assert.equal(persisted.resolutionMode, 'iterative');
     assert.deepEqual(iterativeKeys(renormalized), authored, 're-normalizing changes nothing');
-  });
-
-  it('refuses the same payload under the default selectable set', async () => {
-    const h = makeHarness(buildIterativeAuthoringFixture());
-    const packData = prepareForImport(exportCurrent(h, FIXTURE_SYSTEM_ID), 'keep');
-    await assert.rejects(importerFor(h).importFromPackData(packData, { overwriteExisting: true }), {
-      reason: 'resolutionModeUnavailable',
-    });
   });
 });
 

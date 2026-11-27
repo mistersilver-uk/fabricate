@@ -1,4 +1,4 @@
-/** Iterative mode is accepted on read and write but not selectable or importable yet (`resolution-modes`). */
+/** Every one of the six modes is accepted on read and write and is selectable (`resolution-modes`). */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -6,13 +6,8 @@ import { installFoundryEnv } from './helpers/foundryEnv.js';
 
 installFoundryEnv();
 
-const {
-  importModeRefusal,
-  isResolutionModeSelectable,
-  modeChangeRefusal,
-  RESOLUTION_MODES,
-  SELECTABLE_RESOLUTION_MODES,
-} = await import('../src/systems/resolutionModeAvailability.js');
+const availability = await import('../src/systems/resolutionModeAvailability.js');
+const { importModeRefusal, modeChangeRefusal, RESOLUTION_MODES } = availability;
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
 
@@ -20,8 +15,8 @@ const normalizedMode = (resolutionMode) =>
   new CraftingSystemManager({ getRecipes: () => [] })._normalizeSystem({ resolutionMode })
     .resolutionMode;
 
-describe('the selectable set', () => {
-  it('accepts six modes and offers every one but iterative', () => {
+describe('the mode set', () => {
+  it('accepts six modes and exports no selectable subset', () => {
     assert.deepEqual(RESOLUTION_MODES, [
       'simple',
       'routedByIngredients',
@@ -30,23 +25,14 @@ describe('the selectable set', () => {
       'alchemy',
       'iterative',
     ]);
-    assert.ok(!SELECTABLE_RESOLUTION_MODES.includes('iterative'));
-    assert.ok(!isResolutionModeSelectable('iterative'));
-    assert.ok(isResolutionModeSelectable('alchemy'));
+    assert.equal('SELECTABLE_RESOLUTION_MODES' in availability, false);
+    assert.equal('isResolutionModeSelectable' in availability, false);
   });
 
-  it('honours an injected set in both predicates', () => {
-    assert.ok(isResolutionModeSelectable('iterative', RESOLUTION_MODES));
-    assert.equal(modeChangeRefusal('iterative', RESOLUTION_MODES), null);
-    assert.ok(!isResolutionModeSelectable('alchemy', ['simple']));
-    assert.equal(modeChangeRefusal('alchemy', ['simple']), 'resolutionModeUnavailable');
-  });
-
-  it('refuses an unselectable mode and an unknown token, and lets a legacy alias through', () => {
-    assert.equal(modeChangeRefusal('iterative'), 'resolutionModeUnavailable');
+  it('refuses only an unknown token, and lets every mode and legacy alias through', () => {
     assert.equal(modeChangeRefusal('bogus'), 'resolutionModeUnknown');
     assert.equal(modeChangeRefusal('constructor'), 'resolutionModeUnknown');
-    for (const token of ['routed', 'mapped', 'tiered', 'cauldron', 'simple']) {
+    for (const token of [...RESOLUTION_MODES, 'routed', 'mapped', 'tiered', 'cauldron']) {
       assert.equal(modeChangeRefusal(token), null, token);
     }
   });
@@ -108,55 +94,51 @@ function recordingImporter() {
   return { importer, writes };
 }
 
-const ITERATIVE_PAYLOAD = {
+const ITERATIVE_PAYLOAD = Object.freeze({
   system: { id: 'sys-it', name: 'Forge', resolutionMode: 'iterative', components: [] },
   recipes: [],
-};
+});
 
-describe('the importer refuses before any write or progress toast', () => {
-  const cases = {
-    resolutionModeUnavailable: {
-      payload: ITERATIVE_PAYLOAD,
-      message:
-        'This export uses the Iterative resolution mode, which this version of Fabricate cannot import yet.',
-    },
-    iterativeVersionUnsupported: {
-      payload: {
-        system: {
-          ...ITERATIVE_PAYLOAD.system,
-          resolutionMode: 'simple',
-          iterative: { version: 2 },
-        },
-        recipes: [],
-      },
-      message: "This export's iterative settings were made by a newer version of Fabricate.",
-    },
-  };
-
-  for (const [reason, { payload, message }] of Object.entries(cases)) {
-    it(`refuses ${reason} with plain English and no write`, async () => {
-      const { importer, writes } = recordingImporter();
-      await assert.rejects(importer.importFromPackData(payload), (error) => {
-        assert.equal(error.reason, reason);
-        assert.equal(error.message, message);
-        assert.ok(!error.message.includes(reason), 'the message never shows the reason code');
-        return true;
-      });
-      assert.deepEqual(writes, []);
-    });
-  }
-
-  it('imports the same iterative payload when the full mode set is injected', async () => {
+describe('the importer', () => {
+  it('refuses an iterative block newer than the build before any write or progress toast', async () => {
     const { importer, writes } = recordingImporter();
-    const summary = await importer.importFromPackData(ITERATIVE_PAYLOAD, {
-      selectableModes: RESOLUTION_MODES,
+    const payload = {
+      system: { ...ITERATIVE_PAYLOAD.system, resolutionMode: 'simple', iterative: { version: 2 } },
+      recipes: [],
+    };
+    await assert.rejects(importer.importFromPackData(payload), (error) => {
+      assert.equal(error.reason, 'iterativeVersionUnsupported');
+      assert.equal(
+        error.message,
+        "This export's iterative settings were made by a newer version of Fabricate."
+      );
+      return true;
+    });
+    assert.deepEqual(writes, []);
+  });
+
+  it('imports an iterative payload, ignoring a stale selectableModes option', async () => {
+    for (const options of [undefined, { selectableModes: ['simple'] }]) {
+      const { importer, writes } = recordingImporter();
+      const summary = await importer.importFromPackData(ITERATIVE_PAYLOAD, options);
+      assert.equal(summary.system.created, true);
+      assert.ok(writes.includes('createSystem'), writes.join(', '));
+    }
+  });
+
+  it('game.fabricate.importFromPack forwards a stale selectableModes and still imports', async () => {
+    const { importer, writes } = recordingImporter();
+    const { bindFabricateGlobal } = await import('../src/bootstrap/publicApi.js');
+    bindFabricateGlobal({ compendiumImporter: importer }, {});
+    const summary = await globalThis.game.fabricate.importFromPack(ITERATIVE_PAYLOAD, {
+      selectableModes: ['simple'],
     });
     assert.equal(summary.system.created, true);
     assert.ok(writes.includes('createSystem'), writes.join(', '));
   });
 
-  it('answers null for a selectable mode, a legacy alias and an unknown token', () => {
-    for (const resolutionMode of ['simple', 'tiered', 'unknown-mode', undefined]) {
+  it('answers null for every mode, a legacy alias and an unknown token', () => {
+    for (const resolutionMode of [...RESOLUTION_MODES, 'tiered', 'unknown-mode', undefined]) {
       assert.equal(importModeRefusal({ resolutionMode }), null, String(resolutionMode));
     }
     assert.equal(importModeRefusal({ resolutionMode: 'simple', iterative: { version: 1 } }), null);

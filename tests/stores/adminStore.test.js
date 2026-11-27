@@ -1468,15 +1468,15 @@ describe('createAdminStore', () => {
       return { store, calls };
     }
 
-    it('setResolutionMode refuses iterative and an unknown token before the confirm, writing nothing', async () => {
-      for (const mode of ['iterative', 'bogus']) {
+    it('setResolutionMode confirms and writes iterative, and refuses an unknown token before the confirm', async () => {
+      const refused = await modeChangeHarness(null);
+      assert.equal(await refused.store.setResolutionMode('bogus'), false);
+      assert.deepEqual(refused.calls, { confirm: 0, update: 0 });
+      for (const mode of ['iterative', 'routed']) {
         const { store, calls } = await modeChangeHarness(null);
-        assert.equal(await store.setResolutionMode(mode), false, mode);
-        assert.deepEqual(calls, { confirm: 0, update: 0 }, mode);
+        assert.equal(await store.setResolutionMode(mode), true, mode);
+        assert.deepEqual(calls, { confirm: 1, update: 1 }, mode);
       }
-      const { store, calls } = await modeChangeHarness(null);
-      assert.equal(await store.setResolutionMode('routed'), true, 'a legacy alias still confirms');
-      assert.deepEqual(calls, { confirm: 1, update: 1 });
     });
 
     it('setResolutionMode re-selecting the current iterative mode is still a no-op that succeeds', async () => {
