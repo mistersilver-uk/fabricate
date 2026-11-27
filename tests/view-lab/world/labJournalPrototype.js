@@ -474,7 +474,7 @@ export function seedJournalPrototype(content, state, { component, recipe }) {
       tools: [],
       essenceDefinitions: definitions,
       visibilityMode: hidden || spec.mode === 'alchemy' ? 'restricted' : 'global',
-      features: { ...template.features, multiStepRecipes: true },
+      features: { ...template.features, multiStepRecipes: spec.mode !== 'alchemy' },
       alchemy: { ...template.alchemy, enabled: true, checkMode: 'simple' },
       craftingCheck: {
         enabled: Boolean(formula),

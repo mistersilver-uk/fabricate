@@ -401,20 +401,6 @@ function collectSystemBlockers(system, recipes, components) {
     }
   }
 
-  // Alchemy attempts are single-step, so multi-step recipes left on break recipe authoring.
-  if (mode === 'alchemy' && features.multiStepRecipes === true) {
-    blockers.push({
-      kind: 'system',
-      entityId: null,
-      entityName: trimmed(system?.name) || system?.id || 'system',
-      severity: 'critical',
-      blocks: 'system',
-      code: 'multiStepInAlchemy',
-      message: 'Multi-step recipes cannot be used while the system is in alchemy mode.',
-      nav: { view: 'system-overview' },
-    });
-  }
-
   // Simple or Tiered alchemy makes the check MANDATORY on its slot (`simple` or `routed`); None
   // never checks.
   if (mode === 'alchemy') {

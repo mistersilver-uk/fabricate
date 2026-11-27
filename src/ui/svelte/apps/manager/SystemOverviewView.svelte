@@ -180,10 +180,6 @@
       'IssueProgressiveNoDifficulty',
       'Progressive mode requires at least one component with a difficulty of 1 or more.',
     ],
-    multiStepInAlchemy: [
-      'IssueMultiStepInAlchemy',
-      'Multi-step recipes cannot be used while the system is in alchemy mode.',
-    ],
     alchemyCheckNoFormula: [
       'IssueAlchemyCheckNoFormula',
       'The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.',

@@ -658,3 +658,45 @@ test('iterative → routedByCheck → iterative keeps every iterative key and se
   assert.deepEqual(manager.getSystem(fixture.system.id).iterative, manager._normalizeSystem(fixture.system).iterative);
   assert.ok(manager.getSystem(fixture.system.id).iterative.counters.length > 0, 'the premise: a library');
 });
+
+// Multi-step is clamped off in alchemy by the normalizer (`resolution-modes` § Validation).
+
+test('a change into alchemy with Multi-step on persists it off in the same save, and it stays off', async () => {
+  settingsStore.clear();
+  const saved = [];
+  const manager = makeManager(makeRecipeManager([]), {
+    recordSaves: () => {
+      saved.push(manager.getSystem('sys-1').features.multiStepRecipes);
+    },
+  });
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({ id: 'sys-1', name: 'Forge', features: { multiStepRecipes: true } })
+  );
+  assert.equal(manager.getSystem('sys-1').features.multiStepRecipes, true, 'the premise: on in simple');
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'alchemy' });
+  assert.deepEqual(saved, [false], 'one save, already off');
+
+  await manager.updateSystem('sys-1', { features: { multiStepRecipes: true } });
+  await manager.updateSystem('sys-1', { enableMultiStepRecipes: true });
+  assert.equal(manager.getSystem('sys-1').features.multiStepRecipes, false);
+
+  await manager.updateSystem('sys-1', { resolutionMode: 'simple' });
+  assert.equal(manager.getSystem('sys-1').features.multiStepRecipes, false, 'leaving alchemy leaves it off');
+});
+
+test('createSystem in alchemy (or its cauldron alias) with Multi-step on persists it off', async () => {
+  for (const resolutionMode of ['alchemy', 'cauldron']) {
+    settingsStore.clear();
+    const manager = makeManager(makeRecipeManager([]));
+    const created = await manager.createSystem({
+      id: `sys-${resolutionMode}`,
+      name: 'Still',
+      resolutionMode,
+      features: { multiStepRecipes: true },
+    });
+    assert.equal(created.features.multiStepRecipes, false, resolutionMode);
+    assert.equal(created.enableMultiStepRecipes, false, resolutionMode);
+  }
+});
