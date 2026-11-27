@@ -42,10 +42,11 @@ export function iterativeStatusPill(status, enableBlocked) {
   return status?.id === 'ready' && enableBlocked === true ? null : (status ?? null);
 }
 
-/** The input the editor's readiness mapper reads: the recipe's issues and its explicit steps. */
+/** The input the editor's readiness mapper reads: the recipe's issues, its explicit steps and its Counter Instance ids. */
 export function iterativeReadinessInput(recipeIssues, recipe) {
   return {
     issues: recipeIssues,
+    counterIds: arrayOrEmpty(recipe?.iterative?.counters).map((instance) => instance?.counterId),
     steps: arrayOrEmpty(recipe?.steps).map((step, index) => ({
       index,
       id: step?.id ?? null,

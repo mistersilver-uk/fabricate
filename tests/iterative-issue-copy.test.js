@@ -10,6 +10,7 @@ import {
 } from '../src/systems/iterative/iterativeReadiness.js';
 import {
   ITERATIVE_ISSUE_KEYS,
+  ITERATIVE_ISSUE_NAMED_KEYS,
   iterativeIssueSentence,
   overviewIssueGroup,
 } from '../src/ui/svelte/apps/manager/iterative/iterativeIssueCopy.js';
@@ -86,4 +87,106 @@ test('iterativeIssueSentence localizes an iterative code and falls back to the i
   assert.equal(iterativeIssueSentence({ code: 'toString' }, text), '');
   assert.equal(iterativeIssueSentence(null, text), '');
   assert.equal(asked.length, 1, 'a code that is not iterative never reaches the localizer');
+});
+
+/** A localizer that reads `en.json`, as the shell's does, and gives `fallback` for an unknown key. */
+const english = (key, fallback) => lookup(key) ?? fallback;
+const named = (code, name) => ({
+  code,
+  message: 'headless',
+  ...(code.endsWith('Action') || code === 'iterativeCheckUnavailable'
+    ? { actionName: name }
+    : { counterName: name }),
+});
+
+test('a named issue reads its counter or action in each of the seven sentences', () => {
+  const sentence = (code, name) => iterativeIssueSentence(named(code, name), english);
+  assert.equal(
+    sentence('iterativeUnknownCounter', 'Rust'),
+    'Rust is not a counter this recipe can use.'
+  );
+  assert.equal(
+    sentence('iterativeInvalidNumber', 'Heat'),
+    'Heat has a start, start formula, bound or target that cannot be read.'
+  );
+  assert.equal(
+    sentence('iterativeBoundsInverted', 'Heat'),
+    'The minimum of Heat is above its maximum.'
+  );
+  assert.equal(
+    sentence('iterativeStartOutOfBounds', 'Heat'),
+    'Heat starts outside its minimum or maximum.'
+  );
+  assert.equal(
+    sentence('iterativeExpressionBoundUnset', 'Heat'),
+    'An expression reads the minimum, maximum or target of Heat that is not set.'
+  );
+  assert.equal(
+    sentence('iterativeUnknownAction', 'anneal'),
+    'anneal is not a crafting action in this system.'
+  );
+  assert.equal(
+    sentence('iterativeCheckUnavailable', 'Stoke'),
+    'Stoke rolls a check, but the routed crafting check has no roll formula.'
+  );
+});
+
+test('an unnamed issue, or a named code with no name, reads the unnamed sentence', () => {
+  for (const code of Object.keys(ITERATIVE_ISSUE_NAMED_KEYS)) {
+    const unnamed = lookup(ITERATIVE_ISSUE_KEYS[code]);
+    assert.equal(iterativeIssueSentence({ code, message: 'headless' }, english), unnamed, code);
+    assert.equal(iterativeIssueSentence(named(code, ''), english), unnamed, code);
+    assert.equal(iterativeIssueSentence({ code, counterName: 7, actionName: 7 }, english), unnamed);
+  }
+});
+
+test('a name never changes a code with no named sentence', () => {
+  const issue = { code: 'iterativeNoSuccessRule', message: 'headless', counterName: 'Heat' };
+  assert.equal(
+    iterativeIssueSentence(issue, english),
+    lookup(ITERATIVE_ISSUE_KEYS.iterativeNoSuccessRule)
+  );
+});
+
+test('an unresolved named key reads the unnamed message and never a literal placeholder', () => {
+  const unnamedOnly = (key, fallback) => (key.endsWith('Named') ? fallback : `${fallback}!`);
+  const sentence = iterativeIssueSentence(named('iterativeUnknownCounter', 'Rust'), unnamedOnly);
+  assert.equal(sentence, 'headless!');
+  const blank = (key, fallback) => (key.endsWith('Named') ? '' : fallback);
+  assert.equal(iterativeIssueSentence(named('iterativeUnknownAction', 'x'), blank), 'headless');
+});
+
+test('a name is filled verbatim, whatever replacement pattern it contains', () => {
+  const sentence = iterativeIssueSentence(
+    named('iterativeBoundsInverted', 'Cost $& $1 $$'),
+    english
+  );
+  assert.equal(sentence, 'The minimum of Cost $& $1 $$ is above its maximum.');
+  const action = iterativeIssueSentence(named('iterativeUnknownAction', '$`x'), english);
+  assert.equal(action, '$`x is not a crafting action in this system.');
+});
+
+test('each named key is a code of the unnamed map, in its namespace, with its own placeholder', () => {
+  const actionCodes = new Set(['iterativeUnknownAction', 'iterativeCheckUnavailable']);
+  assert.equal(Object.keys(ITERATIVE_ISSUE_NAMED_KEYS).length, 7);
+  for (const [code, key] of Object.entries(ITERATIVE_ISSUE_NAMED_KEYS)) {
+    assert.ok(Object.hasOwn(ITERATIVE_ISSUE_KEYS, code), `${code} is not an iterative code`);
+    const pascal = `${code[0].toUpperCase()}${code.slice(1)}`;
+    assert.equal(key, `FABRICATE.Admin.Manager.SystemOverview.Issue${pascal}Named`);
+    const sentence = lookup(key);
+    assert.equal(typeof sentence, 'string', `${key} is missing from lang/en.json`);
+    const [wanted, other] = actionCodes.has(code)
+      ? ['{action}', '{counter}']
+      : ['{counter}', '{action}'];
+    assert.equal(sentence.split(wanted).length, 2, `${key} names ${wanted} once`);
+    assert.ok(!sentence.includes(other), `${key} must not name ${other}`);
+  }
+});
+
+test('a named key that resolves to a non-string reads the unnamed message', () => {
+  const nonString = (key, fallback) => (key.endsWith('Named') ? 7 : fallback);
+  assert.equal(
+    iterativeIssueSentence(named('iterativeUnknownCounter', 'Rust'), nonString),
+    'headless'
+  );
 });

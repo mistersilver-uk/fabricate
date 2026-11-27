@@ -76,8 +76,15 @@ describe('the system report carries every iterative issue in full', () => {
   it('gives each issue the full shape and English that is not its code', () => {
     for (const issue of issues) {
       const address = issue.kind === 'recipe' ? ['stepId', 'stepIndex'] : [];
+      // A recipe issue may name its counter or action (issue 3038), always as an id and name pair.
+      const named = [];
+      if (issue.kind === 'recipe' && Object.hasOwn(issue, 'counterId'))
+        named.push('counterId', 'counterName');
+      if (issue.kind === 'recipe' && Object.hasOwn(issue, 'actionId'))
+        named.push('actionId', 'actionName');
+      const byName = (a, b) => a.localeCompare(b);
       assert.deepEqual(
-        Object.keys(issue).sort((a, b) => a.localeCompare(b)),
+        Object.keys(issue).sort(byName),
         [
           'blocks',
           'code',
@@ -89,7 +96,8 @@ describe('the system report carries every iterative issue in full', () => {
           'nav',
           'severity',
           ...address,
-        ],
+          ...named,
+        ].sort(byName),
         issue.code
       );
       assert.ok(['recipe', 'system'].includes(issue.kind));

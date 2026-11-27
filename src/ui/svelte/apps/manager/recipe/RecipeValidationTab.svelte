@@ -221,7 +221,12 @@
   function issueTitle(issue) {
     if (issue.iterativeCode) {
       const sentence = iterativeIssueSentence(
-        { code: issue.iterativeCode, message: issue.message },
+        {
+          code: issue.iterativeCode,
+          message: issue.message,
+          counterName: issue.counterName,
+          actionName: issue.actionName,
+        },
         text
       );
       const prefix = issue.stepName || issue.entityName;
