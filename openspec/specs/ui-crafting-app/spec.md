@@ -20,6 +20,7 @@ The unified window holds five shared read-model stores — `crafting`, `inventor
   `held-inventory` stays out because the gathering view owns an item subscription scoped to the selected actor, which is narrower.
 - A change that names no domain refreshes every store.
 - A change to the selected crafting actor's run flags quietly reloads the `crafting` store, because an iterative recipe's workpiece is read from those runs; another actor's runs, and any change outside the run flags, reload nothing.
+- Only a browse store's newest load commits: a load a later one overtook while its fetch was in flight commits neither its listing nor its error.
 - A change to an actor's held items belongs to the `held-inventory` domain and refreshes exactly that domain's consumers, filtered to actors this window reads from.
 - The shell reloads the inventory listing through the store's bulk-run guard and MUST NOT call the store's direct load seam, on any of these paths.
 - The selectable component-source ACTOR list is refreshed alongside the `crafting` store.
@@ -964,10 +965,12 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
     - a goal strip of Succeeds when, Fails when and Produces, each stated only when the recipe has it;
     - the header primary "Start crafting", which stays "Start crafting" after an earlier roll.
   - While the actor has an active workpiece of the recipe:
-    - the header primary is "Continue in Journal", which opens that workpiece in the Journal and starts nothing;
-    - the body is one strip stating the current step, the counters the viewer may see and the next session, and the pane shows no material shortfall, status, scrim, blocker, requirement table or run summary;
+    - the header primary is "Continue in Journal", which opens that workpiece in the Journal and starts nothing; when the Journal lists another actor, it switches to the crafting actor first;
+    - the body is one strip headed "In progress: {step}", or "In progress" alone for an unnamed single step, stating the counters the viewer may see and "Session {session} next", and the pane shows no material shortfall, status, scrim, blocker or requirement table;
     - it continues the actor's first active workpiece of the recipe, so a second start is not offered;
-    - a counter the viewer may not see, and an unreadable run, state nothing.
+    - a counter the viewer may not see states nothing, and an unreadable run states no counters or session but is still continued, never restarted;
+    - the recipe's browser row states no status either: no danger tone, pip, scrim or status chip, and its accessible name reads "In progress".
+  - An iterative recipe shows no run summary or roll result in either face; its outcome is the Journal's.
   - A redacted teaser shows its header only, in both faces.
 - Show the `modeLabel` rather than the raw mode token.
 - Before crafting begins, the detail header visibly shows a fully revealed timed
