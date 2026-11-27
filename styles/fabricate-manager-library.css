@@ -505,15 +505,6 @@
   font-weight: 600;
 }
 
-/* The Overview's section cards draw `InspectorCard`'s box; this rule only stacks a card's head over its body at the card's 8px rhythm. */
-.fabricate-manager .manager-recipe-duration-card,
-.fabricate-manager .manager-recipe-steps-card,
-.fabricate-manager .manager-recipe-routing-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
 .fabricate-manager .manager-recipe-duration-pill {
   flex: 0 0 auto;
   font-family: var(--fab-font-mono);
