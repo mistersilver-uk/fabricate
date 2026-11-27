@@ -182,6 +182,15 @@ describe('summary shape — one documented shape per entity', () => {
     assert.equal(player.audience, SUMMARY_AUDIENCE.PLAYER);
   });
 
+  it('carries the caller’s in-progress reading, and never on a redacted teaser (issue 3011)', () => {
+    const recipe = makeRecipe();
+    const at = (access, inProgress) =>
+      projectRecipeSummary({ recipe, system: SYSTEM, access, inProgress }).inProgress;
+    assert.equal(at(VISIBLE_ACCESS, true), true);
+    assert.equal(at(VISIBLE_ACCESS, undefined), false, 'absent reads as not in progress');
+    assert.equal(at(TEASER_ACCESS, true), false, 'a teaser discloses no run of it');
+  });
+
   it('emits exactly the manifest keys for a component summary, with no audience axis', () => {
     const summary = projectComponentSummary({ component: IRON, systemId: SYSTEM_ID });
     assert.deepEqual(

@@ -70,7 +70,7 @@ import {
 } from './craftingBrowseStatus.js';
 import { countFormulaDisplay, sumFormulaDisplay } from './craftingFormulaDisplay.js';
 import { heldToolBonus } from './heldToolBonus.js';
-import { iterativeCraftingFace } from './iterative/iterativeCraftingFace.js';
+import { iterativeCraftingFace, workpieceRecipeIds } from './iterative/iterativeCraftingFace.js';
 import { resultOutputRows, resultSignature, taughtNameReader } from './resultOutputRows.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 import { createToolReadySetsProbe } from './summaryToolPresence.js';
@@ -234,6 +234,14 @@ export class CraftingListingBuilder {
       craftSources,
       craftingActor,
     });
+    // Read once, and only when an iterative row asks: the recipes the actor holds a workpiece of.
+    let workpieceIds = null;
+    const holdsWorkpiece = (recipeId) => {
+      workpieceIds ??= workpieceRecipeIds(
+        craftingActor ? this.craftingRunManager?.getActiveRuns?.(craftingActor) : []
+      );
+      return workpieceIds.has(recipeId);
+    };
     for (const entry of visibleEntries) {
       const recipe = entry?.recipe;
       if (!recipe) continue;
@@ -248,6 +256,7 @@ export class CraftingListingBuilder {
           knowledgeSources,
           readRollData,
           toolReadySetsOf,
+          holdsWorkpiece,
         })
       );
     }
@@ -364,7 +373,9 @@ export class CraftingListingBuilder {
   _withIterativeFace(model, { recipe, isGM, craftingActor }) {
     if (model?.modeToken !== 'iterative' || model.redaction?.redacted) return model;
     const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
-    const run = this.craftingRunManager?.findActiveRunForRecipe?.(craftingActor, recipe.id);
+    const run = craftingActor
+      ? (this.craftingRunManager?.findActiveRunForRecipe?.(craftingActor, recipe.id) ?? null)
+      : null;
     const face = { recipe, system, run, gm: isGM, localize: this.localize };
     return { ...model, iterative: iterativeCraftingFace(face) };
   }
@@ -409,6 +420,7 @@ export class CraftingListingBuilder {
     knowledgeSources,
     readRollData,
     toolReadySetsOf,
+    holdsWorkpiece = () => false,
   }) {
     const redacted = !isGM && stringOrEmpty(access?.reason) === 'teaser';
     const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
@@ -427,6 +439,7 @@ export class CraftingListingBuilder {
         ? null
         : toolReadySetsOf(this._stepRecipeView(recipe, this._firstStep(recipe))),
       favourite: false,
+      inProgress: !redacted && system?.resolutionMode === 'iterative' && holdsWorkpiece(recipe.id),
       localize: this.localize,
     });
   }

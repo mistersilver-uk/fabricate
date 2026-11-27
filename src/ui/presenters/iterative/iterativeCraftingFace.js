@@ -62,10 +62,8 @@ function goalOf({ recipe, system, gm, localize }) {
   };
 }
 
-/** The run's step, the counters this viewer may see on it, and the session it takes next. */
-function workpieceOf({ run, gm }) {
-  const read = readIterativeRun(run);
-  if (!read?.supported) return null;
+/** The counters on the run's focus step this viewer may see, each with its label and value. */
+function visibleCounters({ run, read, gm }) {
   const terms = run.termsSnapshot ?? {};
   const view = iterativeStepsOf(terms.recipe).find(
     (entry) => entry.stepIndex === read.focusStepIndex
@@ -76,27 +74,58 @@ function workpieceOf({ run, gm }) {
     gm,
   });
   const labels = labelReader(terms.iterative ?? {}, hidden);
+  return arrayOrEmpty(read.state?.counters)
+    .filter((row) => labels.counter(row?.counterId))
+    .map((row) => ({
+      counterId: row.counterId,
+      label: labels.counter(row.counterId),
+      value: Number(row.value),
+    }));
+}
+
+/**
+ * The step's authored name, from the run's accepted terms when it carries them: a stepless recipe's
+ * one step has none, whatever default name the run recorded for it.
+ */
+function stepNameOf(run, stepIndex) {
+  const terms = run.termsSnapshot?.recipe;
+  if (terms) return arrayOrEmpty(terms.steps)[stepIndex]?.name || '';
+  return run.steps?.[stepIndex]?.stepName || '';
+}
+
+/**
+ * The run's step, the counters this viewer may see on it, and the session it takes next. A run
+ * this release cannot read states no counters or session, but is still continued, never restarted.
+ */
+function workpieceOf({ run, gm }) {
+  const read = readIterativeRun(run);
+  if (!read) return null;
   const stepIndex = read.currentStepIndex ?? read.focusStepIndex;
-  const live = read.started && read.state?.terminal == null;
+  const live = read.supported && read.started && read.state?.terminal == null;
   return {
     runId: run.id,
     stepIndex,
-    stepName: run.steps?.[stepIndex]?.stepName || terms.recipe?.steps?.[stepIndex]?.name || '',
+    stepName: stepNameOf(run, stepIndex),
     stepCount: arrayOrEmpty(run.steps).length,
-    counters: arrayOrEmpty(read.state?.counters)
-      .filter((row) => labels.counter(row?.counterId))
-      .map((row) => ({
-        counterId: row.counterId,
-        label: labels.counter(row.counterId),
-        value: Number(row.value),
-      })),
+    counters: read.supported ? visibleCounters({ run, read, gm }) : [],
     nextSession: live ? Number(read.state.sessionCount ?? 0) + 1 : null,
   };
 }
 
+/** The recipe ids whose first run in `runs` holds a workpiece, as the detail's face reads one. */
+export function workpieceRecipeIds(runs) {
+  const first = new Map();
+  for (const run of arrayOrEmpty(runs)) {
+    if (!first.has(run?.recipeId)) first.set(run?.recipeId, run);
+  }
+  return new Set(
+    [...first].filter(([, run]) => readIterativeRun(run) !== null).map(([recipeId]) => recipeId)
+  );
+}
+
 /**
  * `{ goal, workpiece }` for an iterative recipe: `workpiece` is `null` until the actor's active
- * run of it exists (or when this release cannot read it), and `goal` always reads the recipe.
+ * run of it exists, and `goal` always reads the recipe.
  */
 export function iterativeCraftingFace({ recipe, system, run, gm = false, localize }) {
   return {

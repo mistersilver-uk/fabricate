@@ -63,7 +63,7 @@ const STEPS = [
   },
 ];
 
-function recipeOf({ mode = 'iterative' } = {}) {
+function recipeOf({ mode = 'iterative', steps = STEPS } = {}) {
   const base = {
     id: 'recipe-1',
     name: 'Forge a Longsword',
@@ -78,7 +78,7 @@ function recipeOf({ mode = 'iterative' } = {}) {
     resultGroups: [],
   };
   return mode === 'iterative'
-    ? { ...base, steps: STEPS, getExecutionSteps: () => STEPS }
+    ? { ...base, steps, getExecutionSteps: () => steps }
     : {
         ...base,
         iterative: undefined,
@@ -100,14 +100,15 @@ const stateAt = (values, sessions) => ({
 function runOf({
   currentStepIndex = 0,
   state = stateAt({ shape: 20, integrity: 8, secret: 7731 }, 3),
+  steps = STEPS,
 } = {}) {
-  const recipe = recipeOf();
+  const recipe = recipeOf({ steps });
   return {
     id: 'run-1',
     recipeId: recipe.id,
     status: 'inProgress',
     currentStepIndex,
-    steps: STEPS.map((step, index) => ({
+    steps: steps.map((step, index) => ({
       stepName: step.name,
       status: index === currentStepIndex ? 'inProgress' : 'pending',
       iterative: index === currentStepIndex ? state : undefined,
@@ -116,12 +117,18 @@ function runOf({
   };
 }
 
-/** A run manager that counts each `getActiveRuns` read, however it is reached. */
+/**
+ * A run manager that counts each `getActiveRuns` read, however it is reached, and records the actor
+ * each read names. Like the real container read, it throws for no actor.
+ */
 function countingRunManager(runs) {
   const manager = {
     reads: 0,
-    getActiveRuns() {
+    actors: [],
+    getActiveRuns(actor) {
+      if (!actor) throw new TypeError("Cannot read properties of null (reading 'id')");
       manager.reads += 1;
+      manager.actors.push(actor);
       return runs;
     },
     findActiveRunForRecipe: (actor, recipeId) =>
@@ -162,6 +169,21 @@ function makeBuilder({ recipe, runs = [], mode = 'iterative' }) {
 
 const detail = (builder, viewer = PLAYER) =>
   builder.buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: ACTOR, viewer });
+
+const TEASER = () => ({ visible: true, reason: 'teaser' });
+
+/** One step whose failure reads `integrity` and `shape`, hiding `hidden` and producing `results`. */
+const stepOf = (id, { hidden = [], results = [{ componentId: 'c1', quantity: 1 }] } = {}) => ({
+  ...STEPS[1],
+  id,
+  name: id,
+  resultGroups: [{ id: `${id}-good`, name: 'Good', results }],
+  iterative: {
+    ...STEPS[1].iterative,
+    hiddenCounterIds: hidden,
+    failure: [rule('integrity', '<=', 0), rule('shape', '<=', 0)],
+  },
+});
 
 describe('CraftingListingBuilder — the iterative face (issue 3011)', () => {
   it('leaves a non-iterative model exactly as the model builder made it, with no extra run read', () => {
@@ -265,9 +287,169 @@ describe('CraftingListingBuilder — the iterative face (issue 3011)', () => {
     );
   });
 
-  it('shows no workpiece for a run whose state this release cannot read', () => {
+  it('still continues a run whose state this release cannot read, stating no counters or session', () => {
     const future = runOf({ state: { ...stateAt({ shape: 1 }, 1), version: 99 } });
     const { builder } = makeBuilder({ recipe: recipeOf(), runs: [future] });
-    assert.equal(detail(builder).iterative.workpiece, null);
+    const { workpiece } = detail(builder).iterative;
+    assert.equal(workpiece.runId, 'run-1');
+    assert.deepEqual(workpiece.counters, []);
+    assert.equal(workpiece.nextSession, null);
+  });
+
+  it('reads no run with no crafting actor, rather than throwing', () => {
+    const { builder, craftingRunManager } = makeBuilder({ recipe: recipeOf(), runs: [runOf()] });
+    const model = builder.buildRecipeDetail({
+      recipeId: 'recipe-1',
+      craftingActor: null,
+      viewer: GM,
+    });
+    assert.equal(model.iterative.workpiece, null);
+    assert.equal(craftingRunManager.reads, 0);
+  });
+
+  it('reads the runs of the crafting actor it was given', () => {
+    const { builder, craftingRunManager } = makeBuilder({ recipe: recipeOf(), runs: [runOf()] });
+    detail(builder);
+    assert.ok(craftingRunManager.actors.length > 0);
+    assert.ok(craftingRunManager.actors.every((actor) => actor === ACTOR));
+  });
+
+  it('passes a redacted teaser through unread, with no iterative face', () => {
+    const faced = makeBuilder({ recipe: recipeOf(), runs: [runOf()] });
+    const bare = makeBuilder({ recipe: recipeOf(), runs: [runOf()] });
+    faced.builder.recipeVisibility = { evaluateRecipeAccess: TEASER };
+    bare.builder.recipeVisibility = { evaluateRecipeAccess: TEASER };
+    bare.builder._withIterativeFace = (model) => model;
+    const model = detail(faced.builder);
+    assert.equal(model.redaction.redacted, true);
+    assert.ok(!('iterative' in model));
+    assert.equal(faced.craftingRunManager.reads, bare.craftingRunManager.reads);
+  });
+
+  it('drops a counter a step hides from the goal and the workpiece, for a player only', () => {
+    const steps = [stepOf('only', { hidden: ['integrity'] })];
+    const { builder } = makeBuilder({ recipe: recipeOf({ steps }), runs: [runOf({ steps })] });
+    const player = detail(builder).iterative;
+    assert.ok(!player.goal.fails.includes('Integrity'));
+    assert.deepEqual(
+      player.workpiece.counters.map((row) => row.counterId),
+      ['shape']
+    );
+    const gm = detail(builder, GM).iterative;
+    assert.match(gm.goal.fails, /Integrity/u);
+    assert.deepEqual(
+      gm.workpiece.counters.map((row) => row.counterId),
+      ['shape', 'integrity', 'secret']
+    );
+  });
+
+  it('hides at a boundary the counters the focus step hides, not the current step', () => {
+    const steps = [stepOf('first', { hidden: ['shape'] }), stepOf('second')];
+    const boundary = {
+      ...runOf({ steps }),
+      currentStepIndex: 1,
+      steps: [
+        { stepName: 'first', iterative: stateAt({ shape: 9, integrity: 4 }, 1) },
+        { stepName: 'second' },
+      ],
+    };
+    const { builder } = makeBuilder({ recipe: recipeOf({ steps }), runs: [boundary] });
+    assert.deepEqual(
+      detail(builder).iterative.workpiece.counters.map((row) => row.counterId),
+      ['integrity']
+    );
+  });
+
+  it('names each produced component once, an unknown one by the fallback', () => {
+    const results = [
+      { componentId: 'c1', quantity: 1 },
+      { componentId: 'c1', quantity: 1 },
+      { componentId: 'gone', quantity: 1 },
+    ];
+    const steps = [stepOf('only', { results })];
+    const { builder } = makeBuilder({ recipe: recipeOf({ steps }) });
+    assert.equal(
+      detail(builder).iterative.goal.produces,
+      `Longsword, ${localize('FABRICATE.Labels.UnknownComponent')}`
+    );
+  });
+
+  it('reads the produced names off the recipe itself when it has no steps', () => {
+    const recipe = {
+      ...recipeOf({ steps: [] }),
+      resultGroups: [{ id: 'g', name: 'G', results: [{ componentId: 'c2', quantity: 1 }] }],
+    };
+    const { builder } = makeBuilder({ recipe });
+    assert.equal(detail(builder).iterative.goal.produces, 'Blade blank');
+  });
+
+  it('names the step from the run’s accepted terms, not the default the run recorded', () => {
+    const run = runOf();
+    run.steps[0].stepName = 'Step 1';
+    const { builder } = makeBuilder({ recipe: recipeOf(), runs: [run] });
+    assert.equal(detail(builder).iterative.workpiece.stepName, 'Rough out the blade');
+  });
+
+  it('names no step for a stepless recipe, whatever default the run recorded', () => {
+    const run = runOf({ steps: [] });
+    delete run.termsSnapshot.recipe.steps; // A stepless recipe serializes no steps at all.
+    run.steps = [{ stepName: 'Step 1', status: 'inProgress', iterative: stateAt({ shape: 1 }, 0) }];
+    const { builder } = makeBuilder({ recipe: recipeOf({ steps: [] }), runs: [run] });
+    assert.equal(detail(builder).iterative.workpiece.stepName, '');
+  });
+
+  it('names the step from the run itself when it carries no accepted terms', () => {
+    const run = { ...runOf(), termsSnapshot: { iterative: clone(LIBRARY) } };
+    const { builder } = makeBuilder({ recipe: recipeOf(), runs: [run] });
+    assert.equal(detail(builder).iterative.workpiece.stepName, 'Rough out the blade');
+  });
+
+  it('names no next session once the current step has reached its end', () => {
+    const ended = runOf({
+      state: {
+        ...stateAt({ shape: 60, integrity: 8, secret: 1 }, 2),
+        terminal: { kind: 'success', attempt: 2, resultGroupId: null },
+      },
+    });
+    const { builder } = makeBuilder({ recipe: recipeOf(), runs: [ended] });
+    assert.equal(detail(builder).iterative.workpiece.nextSession, null);
+  });
+});
+
+describe('CraftingListingBuilder — an iterative row in progress (issue 3011)', () => {
+  /** The listing pass over `recipes`, each visible under `reason`. */
+  function listing({ recipes, runs = [], mode = 'iterative', reason = 'ok', actor = ACTOR }) {
+    const made = makeBuilder({ recipe: recipes[0], runs, mode });
+    made.builder.recipeVisibility.getVisibleRecipes = () =>
+      recipes.map((recipe) => ({ recipe, access: { visible: true, reason } }));
+    const { summaries } = made.builder.buildListing({ craftingActor: actor, viewer: PLAYER });
+    return { summaries, reads: made.craftingRunManager.reads };
+  }
+  const second = { ...recipeOf(), id: 'recipe-2', name: 'Forge a Spear' };
+
+  it('marks the row of a recipe whose workpiece is in progress, reading the runs once a pass', () => {
+    const { summaries, reads } = listing({ recipes: [recipeOf(), second], runs: [runOf()] });
+    assert.deepEqual(
+      summaries.map((row) => [row.id, row.inProgress]),
+      [
+        ['recipe-1', true],
+        ['recipe-2', false],
+      ]
+    );
+    assert.equal(reads, 1);
+  });
+
+  it('marks no row, and reads nothing, for a teaser, another mode or no actor', () => {
+    for (const options of [{ reason: 'teaser' }, { mode: 'simple' }, { actor: null }]) {
+      const { summaries, reads } = listing({ recipes: [recipeOf()], runs: [runOf()], ...options });
+      assert.equal(summaries[0].inProgress, false, JSON.stringify(options));
+      assert.equal(reads, 0, JSON.stringify(options));
+    }
+  });
+
+  it('marks no row whose first run of the recipe is not an iterative one', () => {
+    const plain = { id: 'run-0', recipeId: 'recipe-1', status: 'inProgress', steps: [{}] };
+    const { summaries } = listing({ recipes: [recipeOf()], runs: [plain, runOf()] });
+    assert.equal(summaries[0].inProgress, false);
   });
 });
