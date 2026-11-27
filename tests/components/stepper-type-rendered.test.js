@@ -2,7 +2,7 @@
  * Issue 2463 — the Stepper computes the type its library entry states: the value at 11.5px with
  * tabular figures, the adjunct glyph at 9px and a disabled group at opacity .45, at every density
  * and in the formatted mode, under the layered module sheet and a host that restyles bare inputs.
- * The library’s `.k-step` drawings measure the boxes it ships.
+ * The library's `.k-step` drawings measure the boxes it ships.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -62,6 +62,7 @@ const INVALID_PAIRS = Object.freeze({
 
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8')}</style>
+<style>@layer reset{*,*::before,*::after{box-sizing:border-box}}</style>
 <style>@layer modules {${readStylesheet()}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, STEPPER)).css}</style>
 </head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
@@ -89,10 +90,12 @@ function readMounted() {
     const field = root.querySelector('[data-stepper-input]');
     const input = getComputedStyle(field);
     const box = root.getBoundingClientRect();
+    const fieldBox = field.getBoundingClientRect();
     const bare = host.querySelector('[data-bare]');
     return {
       value: `${input.fontSize} ${input.fontVariantNumeric}`,
       inputMinWidth: input.minWidth,
+      inputBox: `${fieldBox.width}x${fieldBox.height}`,
       glyphs: [...root.querySelectorAll(':scope > .fab-stepper-adjunct > i')].map(
         (glyph) => getComputedStyle(glyph).fontSize
       ),
@@ -279,7 +282,7 @@ it('draws the narrow and the comfortable group only in the entries that ship the
 const GROUP_CASES = HORIZONTAL.filter((key) => key.startsWith('invalid'));
 const VALID_FACE = () => drawn.units.integer.group;
 
-it('draws the library’s invalid group edge and ground at every rung, density and state', () => {
+it("draws the library's invalid group edge and ground at every rung, density and state", () => {
   const invalid = drawn.units.invalid.group;
   assert.notDeepEqual(invalid, VALID_FACE(), 'the library draws a distinct invalid face');
   assert.deepEqual(GROUP_CASES.length, 7, 'every horizontal invalid mount is read');
@@ -288,22 +291,32 @@ it('draws the library’s invalid group edge and ground at every rung, density a
   }
 });
 
-it('draws the library’s invalid vertical input edge and ground, and no group edge', () => {
+it("draws the library's invalid vertical input edge and ground, and no group edge", () => {
   const unit = drawn.units['invalid · vertical'];
-  assert.notDeepEqual(unit.field, drawn.units['vertical · in a 48px slot'].field);
+  const valid = drawn.units['vertical · in a 48px slot'];
+  assert.notDeepEqual(unit.field, valid.field);
   assert.deepEqual(live.cases['invalid-vertical'].field, unit.field);
+  assert.deepEqual(unit.group, valid.group, "the library's vertical group stays unpainted");
+  assert.deepEqual(
+    live.cases['invalid-vertical'].group,
+    live.cases.vertical.group,
+    'the vertical group stays unpainted'
+  );
   assert.equal(
     live.cases['invalid-vertical'].group.width,
     '0px',
     'a vertical stepper draws no group edge'
   );
-  assert.deepEqual(live.cases.vertical.field, drawn.units['vertical · in a 48px slot'].field);
+  assert.deepEqual(live.cases.vertical.field, valid.field);
+  assert.equal(
+    live.cases['invalid-vertical'].inputBox,
+    live.cases.vertical.inputBox,
+    'the invalid input keeps the valid input box under the host reset'
+  );
 });
 
-it('leaves a valid mount on the library’s valid face, and the invalid input undrawn', () => {
-  const valid = HORIZONTAL.filter(
-    (name) => !name.startsWith('invalid') && !['endpoint', 'hosted'].includes(name)
-  );
+it("leaves a valid mount on the library's valid face, and the invalid input undrawn", () => {
+  const valid = HORIZONTAL.filter((name) => !name.startsWith('invalid'));
   for (const key of valid) {
     assert.deepEqual(live.cases[key].group, VALID_FACE(), `${key} group`);
     assert.equal(live.cases[key].field.width, '0px', `${key} input edge`);
