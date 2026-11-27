@@ -18,5 +18,6 @@ scripts/lib/view-lab-cases/managerSpecimens.js
 scripts/lib/view-lab-cases/playerInventory.js
 scripts/lib/view-lab-cases/playerGatheringAndCrafting.js
 scripts/lib/view-lab-cases/playerJournal.js
+scripts/lib/view-lab-cases/playerJournalIterative.js
 scripts/lib/view-lab-cases/coverageMatrix.js
 scripts/lib/view-lab-cases/canvasInteractables.js

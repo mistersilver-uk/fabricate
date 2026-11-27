@@ -846,6 +846,68 @@
     }
   },
   {
+    "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "meter — marks at its thresholds",
+    "draws": ":scope > div:nth-of-type(2)",
+    "path": "src/ui/svelte/components/Meter.svelte",
+    "undrawn": {
+      "45 / 75, reached Fine — Shape ≥ 40": "the announced reading, which states the reached mark; the drawing shows it as the accent tick and its tooltip"
+    },
+    "props": {
+      "value": 45,
+      "max": 75,
+      "label": "Shape",
+      "valueText": "45 / 75, reached Fine — Shape ≥ 40",
+      "segments": [
+        {
+          "tone": "accent"
+        }
+      ],
+      "marks": [
+        {
+          "value": 40,
+          "label": "Fine — Shape ≥ 40"
+        },
+        {
+          "value": 60,
+          "label": "Masterwork — Shape ≥ 60"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Meter> <BandedBar> <StageBars>",
+    "cap": "stages — a failed stage in danger",
+    "draws": ".k-stage-row",
+    "path": "src/ui/svelte/components/StageBars.svelte",
+    "note": "Unnumbered, as the stage row above is: the drawing's caption row stays drawn beneath it.",
+    "undrawn": {
+      "Forge the billet": "the group’s accessible name; the drawing draws no name",
+      "100%, stage 2 of 3, failed": "the failed stage’s reading, its caller’s words; the drawing paints it danger"
+    },
+    "props": {
+      "ariaLabel": "Forge the billet",
+      "currentIndex": 1,
+      "numbered": false,
+      "stages": [
+        {
+          "name": "Draw",
+          "value": 100
+        },
+        {
+          "name": "Fold",
+          "value": 100,
+          "status": "failed",
+          "valueText": "100%, stage 2 of 3, failed"
+        },
+        {
+          "name": "Grind",
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
     "spec": "<WorldClockChip>",
     "cap": "the chip",
     "draws": ":scope > div",

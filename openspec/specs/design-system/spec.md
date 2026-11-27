@@ -114,7 +114,7 @@ Without `onOpen`, or for an item carrying `opens: false`, the row is not a contr
 Every row MUST stand one height whether it opens or not.
 A cross-reference list has no remove and no reorder.
 The player inventory inspector's Sources, Contributing, Used by, Required for and Produced by sections are its first callers.
-With one importer, `XrefList` is recorded as a non-member on the `LogList` and `StageNav` precedent.
+With one importer, `XrefList` is recorded as a non-member on the `LogList` precedent.
 The manager's cross-reference lists are adoption debt.
 
 #### Scenario: A list mixes rows that open with rows that do not
@@ -240,7 +240,7 @@ Its props are `tiers`, each `{ id?, name, figure?, notes?, valence? }` in drawn 
 `valence` is `positive` (the default), `negative` or `neutral`.
 An unknown `direction` or `layout` reads as `ascending` or `row`, and a `currentIndex` that is not an in-range integer reaches nothing.
 It is stated, never operated: it has no event.
-Its one importer is the published-component seam's runtime adapter, through which the premium companion's player faction ladder draws it, so it is recorded as a non-member on the `LogList`, `StageNav` and `XrefList` precedent.
+Its one importer is the published-component seam's runtime adapter, through which the premium companion's player faction ladder draws it, so it is recorded as a non-member on the `LogList` and `XrefList` precedent.
 A tier's valence restates what its name already says and is never the only carrier of it: it is drawn in colour alone and reaches no assistive technology, so a caller MUST NOT use valence to convey a standing its tier names do not state.
 
 #### Scenario: A character stands on the middle rung of a descending ladder
@@ -1363,6 +1363,12 @@ A bar is named by its stage's `label`, else its `name`; the one bar of a one-sta
 An unnamed stage of several has no name, so its caller passes `label`: `RunProgress` passes "Stage n of m" through the `FABRICATE.Common.StageBars.Unnamed` key.
 A bar's reading is its stage's `valueText` where the caller passes a non-empty one and its percentage otherwise: `RunProgress` passes "p%, stage n of m" through the `FABRICATE.Common.StageBars.Position` key for each named stage of several, whose name states no position, and none for an unnamed one, whose label does; `p` is the stage's whole percent, truncated, so a stage short of done never reads 100%.
 A bar's `aria-valuenow` is that same truncated whole percent, whatever the caller passes, so the bars of one group read their percentage alike.
+A stage whose `status` is `failed` paints its fill `danger` at any value, ahead of the filled and current tones, and carries `data-stage-bars-state="danger"`; `StageBars` writes no words, so its caller states the failure in the stage's `valueText`.
+`RunProgress` forwards each stage's `status` and reads a failed stage as "p%, failed", or as "p%, stage n of m, failed" for a named stage of several, through the `FABRICATE.Common.StageBars.Failed` keys.
+`RunProgress` takes a `note`, a muted line beside its kicker after any blocker, carrying its own hook, which describes the track group through `aria-describedby`.
+A meter's `marks` draw a 2×12px tick over its track at each mark and the mark's mono figure in a 12px row beneath, hidden from assistive technology; a mark whose value is not a finite number in `[0, max]` is not drawn, and an empty list draws what the meter drew before marks.
+A reached mark takes the accent, and its caller states it in the mark's `label`, which is the tick's tooltip, and in the meter's `valueText`, so a reached mark is never told by colour alone.
+`marks` is unpublished.
 A named stage's caption is ellipsized on overflow with its stage's name as its `title`, as an entry's time is; the caption stays `aria-hidden`, so the title is a pointer affordance and the bar's own name is what is announced.
 A stage's `shares` draw its fill as `FillBar`'s shares, in place of its state's paint, and the `thin` track draws each bar borderless on `--fab-bg-3` at 6px, where its state paints read under 3:1 in some palettes, so the current stage's `aria-current` and its caller's text, never a colour, say which stage is being worked and which are done.
 A stage's `title` is its bar's `data-tooltip-text`, numbered or not; the bar takes no focus, so the tooltip is a pointer-only hint and never the only carrier of the stage's state, which its `label`, `valueText` and its caller's text state.
@@ -1744,7 +1750,9 @@ An empty state INSIDE AN OVERLAY the product has already drawn a boundary around
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
 `StageBars` is the progress instrument, and `StageNav` chooses the stage on screen.
+`StageNav` is a shared primitive: the run detail's stage browser and the Workpiece view's step browser both draw it, each with its own copy.
 `RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and `<RunProgress>` keeps its own entry in the run-surface block, `shipped` since its kicker adopted `Kicker`.
+A counter's card is a composition of `Well`, `Kicker`, a `Meter` with marks and a `Chip`, so `<CounterGauge>` is ruled out.
 A `RuleRow` edits one condition→effect rule, or one condition the caller combines (All/Any): a Check Breakage trigger, a gathering condition modifier's condition and drop-chance change, or an iterative counter predicate.
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
 `Typeahead` is a trigger-less input whose list the query drives; each choice commits immediately, into a single slot, a filter, or one id appended to a short list the CALLER renders, and it owns no token run, no bound and no staging.
@@ -2754,6 +2762,8 @@ An empty table keeps its heading and count, drops the header row, and says what 
 
 Its one implementation is `src/ui/svelte/components/DataTable.svelte`, the library's `<DataTable>`, whose `heading` and `count` are the table's visible `<caption>`; it closes with the shipped pager only when it pages and its count exceeds the smallest page.
 `DataTable` gains `hint` and `footer`, and a caller that passes neither renders the HTML it rendered before.
+`DataTable` gains `pagerDensity`, `default` or `compact`, which it forwards to its pager's `density`; an omitted or unknown value reads `default`.
+A compact pager closes the table's frame as its `edge`, so it carries the section inset rather than meeting the frame's border.
 `hint` is a second caption line, outside the table's accessible name, that describes the table through `aria-describedby`.
 `footer` draws inside the frame after the scroll container and, when the table pages, after the pager, so an adder and its notes sit under the rows.
 Both are painted from the component's own style block, as `:global` rules rooted at `fabricate-data-table`, so the root's class and the family in the module sheet do not move.
@@ -3380,7 +3390,8 @@ The split brings `Chip` under the threshold, so the chip keeps drawing its own r
 
 The player Journal MUST use the active-current, active-browsed, ordinary-history and recovery compositions specified by `ui-journal-app` rather than a universal detail order.
 It MUST reuse the run-control contracts and geometry specified in `library.html`.
-`RunActionBar` MUST retain cancel, pause or resume, completion preference and primary action order.
+`RunActionBar` MUST retain the order of cancel, completion preference, primary action, and pause or resume, unless the caller passes `pause: null`.
+`primary: null` draws no primary, and `pause: null` draws neither pause nor resume, whatever the run's pause state, and keeps begin and the completion preference.
 An armed cancellation decision MUST replace the other actions in that bar until confirmed or dismissed; this is the run bar's explicit carve-out from the default Foundry confirmation dialog.
 `WorldClockChip` MUST remain read-only and accept the application's calendar-formatted value.
 Completion-preference visibility MUST follow the no-player-check countdown contract in `ui-journal-app`, independently of the zero-spend automatic blockers in `recipes-and-steps`.

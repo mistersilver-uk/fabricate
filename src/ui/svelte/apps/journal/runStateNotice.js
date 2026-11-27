@@ -65,6 +65,27 @@ function withheldChoiceNotice(run, text, pausedHook) {
   };
 }
 
+/**
+ * The choice tier: a pick withheld from a redacted viewer, else the player's OWN choice. It reads
+ * as guidance rather than as a refusal, because a stage that has not been given its materials yet
+ * is ordinary play — the same reason `stageNotStarted` raises no banner. Ranked under the
+ * blockers: a run that is also refused has a cause the player cannot choose their way out of
+ * (issue 1648, M10).
+ */
+function choiceNotice(run, text, pausedHook) {
+  const withheld = withheldChoiceNotice(run, text, pausedHook);
+  if (withheld || run?.awaitingChoice !== true) return withheld;
+  return {
+    tone: 'info',
+    blocking: false,
+    title: text('ChoiceTitle'),
+    detail: text('ChoiceDetail'),
+    hooks: { 'data-journal-awaiting-choice': 'true', ...pausedHook },
+    evidence: false,
+    claim: null,
+  };
+}
+
 /** The blocker code, when execution is actually refused. `''` otherwise. */
 export function runBlockerCode(run) {
   const code = run?.actions?.disabledReason;
@@ -73,15 +94,55 @@ export function runBlockerCode(run) {
 }
 
 /**
+ * The ranked tiers of one run's notice, highest first: recovery, an unsupported version (a record,
+ * so non-blocking), any other blocker, the Iterative Attempt notice, then the shipped reward,
+ * choice and paused notices. Only the first tier that applies is shown.
+ */
+export const NOTICE_RANK = Object.freeze([
+  'recovery',
+  'unsupported',
+  'blocker',
+  'iterative',
+  'award',
+  'choice',
+  'paused',
+]);
+
+const UNSUPPORTED_BLOCKERS = new Set(['unsupportedLifecycle', 'version-unsupported']);
+
+/** An iterative descriptor as a notice: polite, with its glyph, ledger, yields and two hooks. */
+function iterativeState(descriptor, pausedHook) {
+  return {
+    tone: descriptor.tone,
+    blocking: false,
+    title: descriptor.title,
+    detail: descriptor.detail,
+    hooks: {
+      'data-iterative-notice': descriptor.kind,
+      'data-iterative-reason': descriptor.reason,
+      ...pausedHook,
+    },
+    evidence: false,
+    claim: null,
+    icon: descriptor.icon,
+    ledger: descriptor.ledger ?? null,
+    yields: descriptor.yields ?? [],
+  };
+}
+
+/**
  * Compose the run's single state notice.
  *
  * @param {object|null} run The RunModel.
  * @param {(key: string, data?: object) => string} localize
+ * @param {object|null} [iterativeNotice] The workpiece's own notice (`iterativeAttempt` store), which
+ *   outranks the shipped reward, choice and paused notices and nothing above them.
  * @returns {{tone: string, blocking: boolean, title: string, detail: string,
- *   hooks: Record<string, string>, evidence: boolean, claim: object|null}|null} `hooks` is the
- *   notice's own `data-*` hook followed by the paused one; `null` when the run has nothing to report.
+ *   hooks: Record<string, string>, evidence: boolean, claim: object|null, icon?: string,
+ *   ledger?: object|null, yields?: object[]}|null} `hooks` is the notice's own `data-*` hook
+ *   followed by the paused one; `null` when the run has nothing to report.
  */
-export function runStateNotice(run, localize) {
+export function runStateNotice(run, localize, iterativeNotice = null) {
   const text = (key, ...data) => localize(`FABRICATE.App.Journal.Notice.${key}`, ...data);
   const paused = Boolean(run?.pauseState);
   const blocker = runBlockerCode(run);
@@ -107,7 +168,7 @@ export function runStateNotice(run, localize) {
   }
 
   // A run created by an unsupported version is a RECORD, not a refusal to act on.
-  if (blocker === 'unsupportedLifecycle') {
+  if (UNSUPPORTED_BLOCKERS.has(blocker)) {
     return {
       tone: 'warning',
       blocking: false,
@@ -134,6 +195,8 @@ export function runStateNotice(run, localize) {
     };
   }
 
+  if (iterativeNotice) return iterativeState(iterativeNotice, pausedHook);
+
   // A reward waiting for a pick, worded for whether this viewer can make it (issue 1773).
   if (run?.awardChoicePending === true) {
     const [title, detail] = rewardNoticeKeys(run);
@@ -148,24 +211,8 @@ export function runStateNotice(run, localize) {
     };
   }
 
-  const withheld = withheldChoiceNotice(run, text, pausedHook);
-  if (withheld) return withheld;
-
-  // Waiting on the player's OWN choice. It reads as guidance rather than as a refusal,
-  // because a stage that has not been given its materials yet is ordinary play — the same
-  // reason `stageNotStarted` raises no banner. Ranked under the blockers: a run that is also
-  // refused has a cause the player cannot choose their way out of (issue 1648, M10).
-  if (run?.awaitingChoice === true) {
-    return {
-      tone: 'info',
-      blocking: false,
-      title: text('ChoiceTitle'),
-      detail: text('ChoiceDetail'),
-      hooks: { 'data-journal-awaiting-choice': 'true', ...pausedHook },
-      evidence: false,
-      claim: null,
-    };
-  }
+  const choice = choiceNotice(run, text, pausedHook);
+  if (choice) return choice;
 
   if (paused) {
     return {
