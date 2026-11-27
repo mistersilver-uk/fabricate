@@ -147,7 +147,7 @@ Every unbegun iterative step is at its own start, its begin control is offered w
 A begun step reports no stage blocker, because its stage has already spent what it needed; the authority still refuses an attempt a lost Tool or a changed workpiece would break.
 Each Crafting Action the focus step allows is a card judged by preflight against the drawn state, and the authority, not the card, decides the attempt.
 The run reads "Ready" only while an attempt can be taken and a card is enabled, and its list step line counts the focus step's completed sessions.
-The header's mode reads "Iterative".
+The header's mode reads "Iterative", except on a redacted run, which shows no mode label.
 
 ##### Hidden counters
 

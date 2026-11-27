@@ -165,11 +165,11 @@ describe('the focus step, the boundary and the derived status, state by state', 
     assert.deepEqual(iterativeRunFields({ run: { id: 'plain', steps: [{}] }, model: {} }), {});
   });
 
-  test('every lab state projects the mode label "Iterative"', () => {
+  test('every lab state projects the mode label "Iterative", and a redacted one none (#3033)', () => {
     for (const state of Object.keys(ITERATIVE_SCENARIOS)) {
       const entry = model(state);
       if (entry.status === 'inProgress' || entry.status === 'waitingTime') {
-        assert.equal(entry.resolutionModeLabel, 'Iterative', state);
+        assert.equal(entry.resolutionModeLabel, entry.redacted ? '' : 'Iterative', state);
       }
     }
   });
