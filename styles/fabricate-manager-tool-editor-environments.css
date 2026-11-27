@@ -35,15 +35,12 @@
   border-bottom: 0;
 }
 
-/* The same routes give the scrolling back to the NAV (issue 3030). The stacked rail pins the label and the scope card and lets the whole rail scroll beneath them, which suits a bounded strip. A side rail is the full height of the body and kept that pin, so a nav row scrolled to the active item was cut flush under `← All crafting systems`, with no gap and half of it hidden. Static blocks and a nav that is the scroller put the clip edge at the nav's own top, one rail gap below the link. */
+/* These routes keep the rail beside the content, so the nav is the scroller and the label and scope card are not pinned (issue 3030). A nav row scrolled to the active item then clips at the nav's own top, below the return link. */
 .fabricate-manager:is(
-    [data-manager-view="tool-edit"],
-    [data-manager-view="tools"],
-    [data-manager-view="knowledge"],
     [data-manager-view="world-downtime"],
     [data-manager-view="component-edit"],
     [data-manager-view="recipe-edit"],
-    [data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"],
+    [data-manager-view="gathering-task-edit"],
     [data-manager-view="world-currency"],
     [data-manager-view="world-prerequisites"],
     [data-manager-view="world-modifiers"],
@@ -61,13 +58,10 @@
 }
 
 .fabricate-manager:is(
-    [data-manager-view="tool-edit"],
-    [data-manager-view="tools"],
-    [data-manager-view="knowledge"],
     [data-manager-view="world-downtime"],
     [data-manager-view="component-edit"],
     [data-manager-view="recipe-edit"],
-    [data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"],
+    [data-manager-view="gathering-task-edit"],
     [data-manager-view="world-currency"],
     [data-manager-view="world-prerequisites"],
     [data-manager-view="world-modifiers"],
@@ -83,6 +77,28 @@
   .manager-rail > .fabricate-nav.manager-nav {
   flex: 1 1 auto;
   overflow: hidden auto;
+}
+
+/* The three routes that restack into a bounded strip at 831px keep the strip's pinned label and rail-level scroll below it (issue 3030). */
+@container fabricate-manager (min-width: 832px) {
+  .fabricate-manager:is(
+      [data-manager-view="tool-edit"],
+      [data-manager-view="tools"],
+      [data-manager-view="knowledge"]
+    )
+    .manager-rail > :is(.manager-rail-title, .manager-rail-block) {
+    position: static;
+  }
+
+  .fabricate-manager:is(
+      [data-manager-view="tool-edit"],
+      [data-manager-view="tools"],
+      [data-manager-view="knowledge"]
+    )
+    .manager-rail > .fabricate-nav.manager-nav {
+    flex: 1 1 auto;
+    overflow: hidden auto;
+  }
 }
 
 /* Below the list frame's own 760px stack the inspector sits under the list, and in a bounded body row the list rows would shrink to nothing, so the list-over-inspector layout sizes its rows to content and is the one scroller (issue 1976). */
