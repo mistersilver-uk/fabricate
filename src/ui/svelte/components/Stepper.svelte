@@ -411,6 +411,12 @@
     background: var(--fab-danger-soft);
   }
 
+  /* Subtle falls under 3:1 on the danger ground in one palette, so the glyphs read secondary. */
+  .fab-stepper:not(.is-vertical):has(> .fab-stepper-input[aria-invalid='true'])
+    .fab-stepper-adjunct:not(:disabled, :hover) {
+    color: var(--fab-text-secondary);
+  }
+
   .fab-stepper.is-vertical .fab-stepper-input[aria-invalid='true'] {
     box-sizing: border-box;
     border: 1px solid var(--fab-danger-border);
@@ -554,6 +560,13 @@
   /* The unset placeholder is text: muted clears 4.5:1 where the user-agent grey does not. */
   .fab-stepper-input:not(:focus-visible)::placeholder {
     color: var(--fab-text-muted);
+  }
+
+  /* Muted does not clear the danger ground in every palette, so an invalid endpoint or
+     placeholder reads secondary. */
+  .fab-stepper-input[aria-invalid='true'][data-stepper-endpoint]:not(:focus-visible),
+  .fab-stepper-input[aria-invalid='true']:not(:focus-visible)::placeholder {
+    color: var(--fab-text-secondary);
   }
 
   .fab-stepper-input::-webkit-outer-spin-button,

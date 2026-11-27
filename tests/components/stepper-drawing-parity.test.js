@@ -153,7 +153,7 @@ test('the kit invalid units declare the shipped edge and ground, on the group an
 test('the kit states declare the shipped hover, limit and disabled inks', () => {
   const hovers = kit
     .flatMap((rule) => splitSelectorList(rule.selector))
-    .filter((selector) => /\.k-step\b.*:hover/u.test(selector));
+    .filter((selector) => /\.k-step\b.*(?<!:not\():hover/u.test(selector));
   assert.deepEqual(hovers, ['.k-step button:not(.dis):hover'], 'a dimmed button takes no hover');
   assertPairs(hovers[0], '.fab-stepper-adjunct:hover:not(:disabled)', [['color'], ['background']]);
   assertPairs('.k-step button.dis', '.fab-stepper-adjunct:disabled', [['color'], ['cursor']]);

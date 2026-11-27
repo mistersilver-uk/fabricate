@@ -123,6 +123,25 @@ const DANGER_FILLS = Object.freeze({
   [`${COMPONENTS}/Medallion.svelte`]: {
     '.fab-medallion.is-tone-danger': [glyphPart('.fab-medallion.is-tone-danger')],
   },
+  [`${COMPONENTS}/Stepper.svelte`]: {
+    ".fab-stepper:not(.is-vertical):has(> .fab-stepper-input[aria-invalid='true'])": [
+      textPart('.fab-stepper-input'),
+      textPart(
+        ".fab-stepper-input[aria-invalid='true'][data-stepper-endpoint]:not(:focus-visible)"
+      ),
+      textPart(".fab-stepper-input[aria-invalid='true']:not(:focus-visible)::placeholder"),
+      glyphPart(
+        ".fab-stepper:not(.is-vertical):has(> .fab-stepper-input[aria-invalid='true']) .fab-stepper-adjunct:not(:disabled, :hover)"
+      ),
+    ],
+    ".fab-stepper.is-vertical .fab-stepper-input[aria-invalid='true']": [
+      textPart('.fab-stepper-input'),
+      textPart(
+        ".fab-stepper-input[aria-invalid='true'][data-stepper-endpoint]:not(:focus-visible)"
+      ),
+      textPart(".fab-stepper-input[aria-invalid='true']:not(:focus-visible)::placeholder"),
+    ],
+  },
   [`${COMPONENTS}/SegmentedControl.svelte`]: {
     '.manager-segment.is-active.is-danger': [
       textPart('.manager-segment.is-active.is-danger'),
