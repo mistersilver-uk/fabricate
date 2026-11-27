@@ -1119,6 +1119,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-ingredients',
     'manager-component-edit-salvage',
     'manager-recipe-edit-overview-routing-check',
+    // The side rails below the 1120px rung (issue 3030): the full and d100 gathering task editors,
+    // a recipe editor, the knowledge and tool breakage views, and the world downtime settings.
+    'manager-gathering-task-editor-straight-narrow',
+    'manager-gathering-task-editor-stacked',
+    'manager-recipe-edit-results-narrow',
+    'manager-knowledge-narrow',
+    'manager-tool-parity-06-breakage-900x700',
+    'manager-world-downtime-narrow-settings',
   ]),
 });
 
