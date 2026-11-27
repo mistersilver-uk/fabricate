@@ -13,6 +13,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { assertOneCard } from '../helpers/inspectorCardShell.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { settle } from '../helpers/listboxKeyboardDriver.js';
 import { missingCensusHooks } from '../helpers/resultRowCensus.js';
@@ -669,19 +670,6 @@ const MODIFIER_SET_MODE_BY_LABEL = Object.freeze({
 function modifierSetMode(target) {
   const shown = selectTriggerText(target, MODIFIER_SET_TRIGGER);
   return MODIFIER_SET_MODE_BY_LABEL[shown] ?? shown;
-}
-
-/** The Overview section `name` is one `InspectorCard`, and no card sits inside a card. */
-function assertOneCard(target, name) {
-  const section = target.querySelector(`[data-recipe-section="${name}"]`);
-  assert.ok(section, `${name} renders`);
-  assert.ok(section.matches('section.fabricate-card'), `${name} is an InspectorCard`);
-  assert.equal(section.querySelectorAll(':scope .fabricate-card').length, 0, `${name} holds a card`);
-  assert.equal(
-    target.querySelectorAll(':scope .fabricate-card .fabricate-card').length,
-    0,
-    'nested cards'
-  );
 }
 
 describe('RecipeEditView (mounted)', () => {
@@ -8788,8 +8776,8 @@ describe('RecipeEditView — the Overview section shells (mounted)', () => {
     const target = await editHarness.mount(
       identityProps({ recipe: { ...RECIPE, steps: [] }, multiStepEnabled: true })
     );
-    assertOneCard(target, 'recipe-step-mode');
-    assertOneCard(target, 'duration');
+    assertOneCard(target, 'recipe-step-mode', 'Step mode', { note: true });
+    assertOneCard(target, 'duration', 'Duration', { note: true });
     const mode = target.querySelector('[data-recipe-section="recipe-step-mode"]');
     assert.ok(mode.classList.contains('manager-recipe-step-mode-card'));
     assert.ok(mode.querySelector(':scope .fab-card-trailing [data-recipe-step-mode-option="single"]'));
@@ -8803,8 +8791,8 @@ describe('RecipeEditView — the Overview section shells (mounted)', () => {
     const target = await editHarness.mount(
       identityProps({ recipe: { ...RECIPE, steps: [STEP] }, multiStepEnabled: true })
     );
-    assertOneCard(target, 'recipe-step-mode');
-    assertOneCard(target, 'steps');
+    assertOneCard(target, 'recipe-step-mode', 'Step mode', { note: true });
+    assertOneCard(target, 'steps', 'Step durations', { note: true });
     editHarness.remount();
   });
 
@@ -8816,7 +8804,7 @@ describe('RecipeEditView — the Overview section shells (mounted)', () => {
         onUpdateStep: () => {},
       })
     );
-    assertOneCard(target, 'collapsed-steps');
+    assertOneCard(target, 'collapsed-steps', 'Steps (multi-step disabled)', { note: true });
     const note = target.querySelector('[data-recipe-collapsed-note]');
     assert.equal(note.tagName, 'SPAN');
     assert.ok(note.parentElement.classList.contains('fab-card-note'));
@@ -8881,7 +8869,7 @@ describe('RecipeEditView — the Overview routing card (mounted)', () => {
 
   it('draws the Routing card as one card, holding none, on one scope and on several (issue 3044)', async () => {
     const single = await mountRouted({ ...RECIPE, resultGroups: [group('g-a', ['t-high'])] });
-    assertOneCard(single.target, 'routing');
+    assertOneCard(single.target, 'routing', 'Routing', { note: true });
     editHarness.remount();
     const steps = ['s1', 's2'].map((id) => ({
       id,
@@ -8890,7 +8878,7 @@ describe('RecipeEditView — the Overview routing card (mounted)', () => {
       resultGroups: [group(`${id}-a`)],
     }));
     const several = await mountRouted({ ...RECIPE, steps }, { multiStepEnabled: true });
-    assertOneCard(several.target, 'routing');
+    assertOneCard(several.target, 'routing', 'Routing', { note: true });
     assert.equal(several.target.querySelectorAll('[data-recipe-routing-scope]').length, 2);
     editHarness.remount();
   });
