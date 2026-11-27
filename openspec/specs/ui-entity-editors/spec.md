@@ -22,7 +22,7 @@ The Recipes page lede then says that every recipe in the system resolves as Iter
 Overview, Ingredients, Results and Tools — the tabs the mode shapes — each carry in their heading block a neutral callout naming the system's `resolutionMode`, describing it, and offering an action that routes to Crafting Settings; the action gives it `role="note"`.
 Resolution mode is a property of the **system**, never of a recipe: the callout reports it and offers no per-recipe control, because the mode dictates the editor's whole shape (one ingredient set or many, tier routing, the alchemy result slots) from outside the recipe.
 Access, Books & Scrolls and Validation carry no mode callout.
-Its copy and icons come from the canonical `resolutionModeOptions` list that System Settings and Crafting Settings already render, whose iterative entry is not offered as a choice while iterative mode is not selectable, so no second, drifting table exists.
+Its copy and icons come from the canonical `resolutionModeOptions` list that System Settings and Crafting Settings already render, whose iterative entry is not offered as a choice yet, so no second, drifting table exists.
 
 ### No right rail
 

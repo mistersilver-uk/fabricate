@@ -182,7 +182,7 @@ It is idempotent, because a second pass finds the mark already non-empty and ret
 `CompendiumImporter.importFromPackData`, which file and pack imports both reach, MUST refuse an export it cannot read before any write or progress toast, right after its GM gate.
 It refuses a system whose `iterative.version` is above the build's (`reason: 'iterativeVersionUnsupported'`).
 The refusal is an `Error` whose `message` is plain English that never shows the `reason` code: "This export's iterative settings were made by a newer version of Fabricate."
-Every mode, a legacy alias and an unknown token are not refused, and normalize as before.
+No mode, legacy alias or unknown token is refused, and each normalizes as before.
 
 An overwrite import that would move an existing system into or out of `iterative` while it has an active crafting run is refused by `updateSystem`, writes no system or recipe, and rethrows that refusal.
 The character-library and world-scope roster merges that precede the system write are kept.

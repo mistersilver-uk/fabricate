@@ -29,7 +29,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   "carry" keeps the recipe verbatim;
   "reconcile" means the recipe survives but its stale routing is surfaced as a
   re-authoring validation issue, never silently mis-routed;
-  "1×1" means the recipe has exactly one ingredient set and one success result group; a reserved `role: 'failure'` group is not counted;
+  "1×1" means the recipe has no explicit steps, exactly one ingredient set and one success result group; a reserved `role: 'failure'` group is not counted;
   "collapse each step" keeps only the first ingredient set of each step, or of a single-step recipe;
   "seed failure line" gives each reserved `role: 'failure'` group with no `producedWhen` the line `{ end: 'failure', rules: [] }`.
 
@@ -44,14 +44,14 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
 
   Migrating into `iterative` deletes no recipe: it clears each scope's `resultSelection`, collapses each step, keeps `checkOutcomeIds`, `outcomeRouting` and `IngredientSet.resultGroupId` unread, and seeds the failure line.
   Migrating out of `iterative` follows the `routedByCheck` row.
-  `CraftingSystem.iterative`, `Recipe.iterative`, `Step.iterative` and `producedWhen` are kept unread on every surviving recipe and result group, so switching back restores them.
+  `CraftingSystem.iterative` is kept unread on the system, and `Recipe.iterative`, `Step.iterative` and `producedWhen` on every surviving recipe, step and result group, so switching back restores them.
   Two exceptions: `progressive` has dropped the reserved failure group, and a failure group that had no `producedWhen` gains the seeded line.
   A change into or out of `iterative` is refused while the system has an active crafting run (`destructive-changes-and-migrations` § Change Crafting System Resolution Mode).
 
   The only structural delete causes are: narrowing into `simple`/`progressive`
-  (which require 1×1) from a recipe with more than one ingredient set or success
-  result group, and moving a multi-STEP recipe into `alchemy` (which has no multi-step
-  support).
+  (which require 1×1) from a recipe with explicit steps, or with more than one
+  ingredient set or success result group, and moving a multi-STEP recipe into
+  `alchemy` (which has no multi-step support).
 Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
   collapse to the first set, NOT a delete.
   `RI↔RC` never deletes (`carry`); it reconciles stale routing.
@@ -1095,6 +1095,7 @@ Its only local memory is the internal fizzle dead-end set (which is not run hist
 ### Validation
 
 - `features.multiStepRecipes` is always `false` in `alchemy`: the system normalizer clamps it, a legacy alias included.
+  Leaving `alchemy` leaves it off.
   An alchemy recipe must have no explicit steps.
 - Exactly one `IngredientSet` (alchemy is never routed by ingredients).
 - Result-group cardinality is per `alchemy.checkMode`:

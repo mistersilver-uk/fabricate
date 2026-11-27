@@ -674,7 +674,7 @@ It is not **Progressive**: Progressive spends one rolled value against ordered t
 It reuses the routed crafting check only for an action with `check: 'roll'`, reading the check's outcome tiers in an effect's `when` and never routing on them.
 `minSuccessOutcomeId`, `failureResultPolicy` and `breakToolsOnFail` are never read, and Tools are used at every step end.
 `RESOLUTION_MODES` holds the mode, so the system normalizer accepts it on read and write.
-`SELECTABLE_RESOLUTION_MODES` leaves it out, so the admin store's mode change and the importer refuse it, and the settings surfaces do not offer it.
+Every mode write path and the importer accept it; the settings surfaces do not offer it yet.
 Fixtures and tests write the mode directly through `createSystem` or `updateSystem`.
 The versioned run start and the step start run for an iterative recipe, and each later move is an **Iterative Attempt**.
 The legacy craft, the versioned execute, the stage check description and the immediate-execute probe refuse it before anything is created, consumed, spent, rolled or awarded.
@@ -691,7 +691,7 @@ The recipe editor offers no Preview tab, and the Recipes page lede says that eve
 For an iterative system the Crafting rail adds Counters and Actions entries after Recipes, and Checks › Crafting shows the **Routed by Check** editor with a callout that one check serves the whole system and each Crafting Action either rolls it or does not.
 The system's iterative issues are grouped under Counters and Actions in the Systems › Validation tab, and none of them blocks the system.
 
-Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, `SELECTABLE_RESOLUTION_MODES`, `modeChangeRefusal` and `importModeRefusal` (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal`, `iterativeStartRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness`, `iterativeStartBlockers` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`), `iterativeRecipeIssues` and `iterativeRecipeStatus` (`src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js`), `ITERATIVE_STATUS` (`src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js`)
+Canonical mapping: `resolutionMode: "iterative"`, `RESOLUTION_MODES`, and the gate `modeChangeRefusal` (an unknown mode token) and `importModeRefusal` (an iterative block newer than the build) (`src/systems/resolutionModeAvailability.js`), `iterativeCraftRefusal`, `iterativeStartRefusal` and `ITERATIVE_CRAFT_REFUSAL` (`src/systems/iterative/iterativeCraftGate.js`), `evaluateIterativeReadiness`, `iterativeStartBlockers` and `needsIterativeSetup` (`src/systems/iterative/iterativeReadiness.js`), `iterativeRecipeIssues` and `iterativeRecipeStatus` (`src/ui/svelte/apps/manager/iterative/iterativeRecipeIssues.js`), `ITERATIVE_STATUS` (`src/ui/svelte/apps/manager/iterative/iterativeStatusCopy.js`)
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/data-models/spec.md, openspec/specs/import-export/spec.md, openspec/specs/recipe-visibility/spec.md, openspec/specs/ui-entity-editors/spec.md
 
