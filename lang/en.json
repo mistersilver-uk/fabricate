@@ -3033,7 +3033,7 @@
           "IssueIngredientSetEssenceQuantity": "Ingredient set \"{set}\" has an invalid essence quantity",
           "IssueIngredientSetDisabledEssence": "Ingredient set \"{set}\" requires essence \"{essence}\", which is disabled in this system",
           "IssueIngredientGroupUnknownTag": "Ingredient group \"{group}\" references unknown tag \"{tag}\"",
-          "IssueIterativeNotReady": "Its iterative setup has {count} blocking issue(s). The recipe's Validation tab lists them."
+          "IssueIterativeNotReady": "Iterative setup has {count} blocking issue(s), listed on the recipe's Validation tab."
         },
         "SystemOverview": {
           "Title": "System overview",

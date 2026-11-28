@@ -304,7 +304,7 @@ test('iterativeNotReady localizes through the shipped key in the toast and the f
       : key;
   };
   const expected =
-    "Localized: Its iterative setup has 2 blocking issue(s). The recipe's Validation tab lists them.";
+    "Localized: Iterative setup has 2 blocking issue(s), listed on the recipe's Validation tab.";
   const error = new RecipeActivationError('Bent Nail', [issue]);
   assert.equal(
     localizeRecipeActivationError(error, localizeFn),

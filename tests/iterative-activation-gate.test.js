@@ -123,8 +123,7 @@ describe('iterativeNotReady agrees with the editor', () => {
       {
         code: 'iterativeNotReady',
         params: { count: 2 },
-        message:
-          "Its iterative setup has 2 blocking issue(s). The recipe's Validation tab lists them.",
+        message: "Iterative setup has 2 blocking issue(s), listed on the recipe's Validation tab.",
       },
     ]);
   });

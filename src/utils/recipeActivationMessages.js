@@ -103,7 +103,7 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   // ACTIVATION-only iterative blocker, counting the recipe's own critical readiness issues.
   iterativeNotReady: [
     'IssueIterativeNotReady',
-    "Its iterative setup has {count} blocking issue(s). The recipe's Validation tab lists them.",
+    "Iterative setup has {count} blocking issue(s), listed on the recipe's Validation tab.",
   ],
 });
 

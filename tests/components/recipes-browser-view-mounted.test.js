@@ -878,7 +878,7 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
     const flash = root.querySelector('[data-recipe-flash]');
     assert.equal(
       flash.querySelector('.fab-notice-detail').textContent.trim(),
-      "Its iterative setup has 2 blocking issue(s). The recipe's Validation tab lists them."
+      "Iterative setup has 2 blocking issue(s), listed on the recipe's Validation tab."
     );
     assert.ok(
       Boolean(document.querySelector(viewCase.expectSelector.replace('.fabricate-manager', 'body'))),
