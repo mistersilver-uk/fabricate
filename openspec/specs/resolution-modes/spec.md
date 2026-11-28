@@ -13,7 +13,7 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   `destructive-changes-and-migrations/spec.md`:
   recipes are migrated to fit the new mode wherever possible and a recipe is
   deleted only when a per-recipe *structural* constraint of the target mode cannot
-  be satisfied by clearing the result selection, collapsing a multi-set recipe, or dropping its reserved failure result group.
+  be satisfied by clearing the result selection, collapsing a multi-set recipe or step, seeding a failure line, or dropping its reserved failure result group.
   System-level gaps (a target mode that needs a check the system has not
   configured, an alchemy signature collision, ...) never delete a recipe; they are
   surfaced as system-validation issues that gate visibility, not deletion.
@@ -29,20 +29,29 @@ A crafting system has exactly one mode, and every recipe/step in that system mus
   "carry" keeps the recipe verbatim;
   "reconcile" means the recipe survives but its stale routing is surfaced as a
   re-authoring validation issue, never silently mis-routed;
-  "1×1" means the recipe has exactly one ingredient set and one success result group; a reserved `role: 'failure'` group is not counted.
+  "1×1" means the recipe has no explicit steps, exactly one ingredient set and one success result group; a reserved `role: 'failure'` group is not counted;
+  "collapse each step" keeps only the first ingredient set of each step, or of a single-step recipe;
+  "seed failure line" gives each reserved `role: 'failure'` group with no `producedWhen` the line `{ end: 'failure', rules: [] }`.
 
-  | From \ To             | `simple`                     | `routedByIngredients`        | `routedByCheck`                          | `progressive`                | `alchemy`                                                           |
-  |-----------------------|------------------------------|------------------------------|------------------------------------------|------------------------------|--------------------------------------------------------------------|
-  | `simple`              | —                            | clear                        | clear; reconcile                         | clear                        | clear; collapse multi-set                                          |
-  | `routedByIngredients` | clear if 1×1 else **delete** | —                            | carry; reconcile                         | clear if 1×1 else **delete** | clear; collapse multi-set; single-step else **delete**            |
-  | `routedByCheck`       | clear if 1×1 else **delete** | carry; reconcile             | —                                        | clear if 1×1 else **delete** | clear; collapse multi-set; single-step else **delete**            |
-  | `progressive`         | clear                        | clear                        | clear; reconcile                         | —                            | clear; collapse multi-set                                          |
-  | `alchemy`             | clear if 1×1 else **delete** | carry                        | carry; reconcile                         | clear if 1×1 else **delete** | —                                                                  |
+  | From \ To             | `simple`                     | `routedByIngredients`        | `routedByCheck`  | `progressive`                | `alchemy`                                              | `iterative`                                       |
+  |-----------------------|------------------------------|------------------------------|------------------|------------------------------|--------------------------------------------------------|---------------------------------------------------|
+  | `simple`              | —                            | clear                        | clear; reconcile | clear                        | clear; collapse multi-set                              | clear; collapse each step; seed failure line      |
+  | `routedByIngredients` | clear if 1×1 else **delete** | —                            | carry; reconcile | clear if 1×1 else **delete** | clear; collapse multi-set; single-step else **delete** | clear; collapse each step; seed failure line      |
+  | `routedByCheck`       | clear if 1×1 else **delete** | carry; reconcile             | —                | clear if 1×1 else **delete** | clear; collapse multi-set; single-step else **delete** | clear; collapse each step; seed failure line      |
+  | `progressive`         | clear                        | clear                        | clear; reconcile | —                            | clear; collapse multi-set                              | clear; collapse each step; seed failure line      |
+  | `alchemy`             | clear if 1×1 else **delete** | carry                        | carry; reconcile | clear if 1×1 else **delete** | —                                                      | clear; collapse each step; seed failure line      |
+  | `iterative`           | clear if 1×1 else **delete** | carry; reconcile             | carry; reconcile | clear if 1×1 else **delete** | clear; collapse multi-set; single-step else **delete** | —                                                 |
+
+  Migrating into `iterative` deletes no recipe: it clears each scope's `resultSelection`, collapses each step, keeps `checkOutcomeIds`, `outcomeRouting` and `IngredientSet.resultGroupId` unread, and seeds the failure line.
+  Migrating out of `iterative` follows the `routedByCheck` row.
+  `CraftingSystem.iterative` is kept unread on the system, and `Recipe.iterative`, `Step.iterative` and `producedWhen` on every surviving recipe, step and result group, so switching back restores them.
+  Two exceptions: `progressive` has dropped the reserved failure group, and a failure group that had no `producedWhen` gains the seeded line.
+  A change into or out of `iterative` is refused while the system has an active crafting run (`destructive-changes-and-migrations` § Change Crafting System Resolution Mode).
 
   The only structural delete causes are: narrowing into `simple`/`progressive`
-  (which require 1×1) from a recipe with more than one ingredient set or success
-  result group, and moving a multi-STEP recipe into `alchemy` (which has no multi-step
-  support).
+  (which require 1×1) from a recipe with explicit steps, or with more than one
+  ingredient set or success result group, and moving a multi-STEP recipe into
+  `alchemy` (which has no multi-step support).
 Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
   collapse to the first set, NOT a delete.
   `RI↔RC` never deletes (`carry`); it reconciles stale routing.
@@ -1085,7 +1094,9 @@ Its only local memory is the internal fizzle dead-end set (which is not run hist
 
 ### Validation
 
-- `features.multiStepRecipes` must be false; an alchemy recipe must have no explicit steps.
+- `features.multiStepRecipes` is always `false` in `alchemy`: the system normalizer clamps it, a legacy alias included.
+  Leaving `alchemy` leaves it off.
+  An alchemy recipe must have no explicit steps.
 - Exactly one `IngredientSet` (alchemy is never routed by ingredients).
 - Result-group cardinality is per `alchemy.checkMode`:
   - **None / Simple** — exactly one SUCCESS group (`role !== 'failure'`).
@@ -1100,13 +1111,10 @@ The gate evaluates a candidate as though its activation had already landed, whet
 
 ### Iterative Mode Availability
 
-- `iterative` is in `RESOLUTION_MODES` (`src/systems/resolutionModeAvailability.js`), which the system normalizer accepts on read and write, so the mode persists.
-- `iterative` is selectable only once `SELECTABLE_RESOLUTION_MODES` includes it.
-- `isResolutionModeSelectable(mode, selectable = SELECTABLE_RESOLUTION_MODES)` is the one predicate the admin store's mode change and the importer consult, and either caller may inject the set.
-- `resolutionModeOptions.js` omits `iterative`, so neither System Settings nor Crafting Settings offers it.
-- The admin store refuses, before its confirm and writing nothing, a change to a known mode outside the selectable set, or to a token that is neither a mode nor a legacy alias.
-  A legacy alias keeps today's path, and re-selecting the current mode is still a no-op that succeeds.
-- Fixtures and tests may write the mode directly through `createSystem` or `updateSystem`, which are not gated.
+- `RESOLUTION_MODES` (`src/systems/resolutionModeAvailability.js`) lists the six modes the normalizer accepts, and the admin store, `createSystem` and `updateSystem` accept any of them.
+- `resolutionModeOptions.js` omits `iterative`, so neither System Settings nor Crafting Settings offers it yet.
+- The admin store refuses, writing nothing, a token that is neither a mode nor a legacy alias (`modeChangeRefusal`); a legacy alias keeps today's path, and re-selecting the saved mode is a no-op that succeeds.
+- `updateSystem` refuses a change into or out of `iterative` while the system has an active crafting run.
 - The versioned run start and the step start run for a recipe in an `iterative` system.
 - The legacy `craft`, the versioned execute, the stage check description and the immediate-execute probe still refuse it before any run, consumption, spend, roll or award, each with `Iterative crafting is not available in this version of Fabricate.`
   A versioned start therefore never answers `canExecuteImmediately: true` for an iterative recipe, and each Iterative Attempt is its own `takeAction` command.

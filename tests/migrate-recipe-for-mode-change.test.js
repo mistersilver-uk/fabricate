@@ -13,7 +13,7 @@ Object.assign(globalThis, {
 });
 const { Recipe } = await import('../src/models/Recipe.js');
 
-const MODES = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
+const MODES = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy', 'iterative'];
 const ROUTED_MODES = ['routedByIngredients', 'routedByCheck'];
 
 // Shared fixtures (Sonar): a 1×1 recipe (single ingredient set + result group), a
@@ -352,13 +352,27 @@ function recipeJSON(data) {
   return new Recipe({ craftingSystemId: 'sys-1', ...data }).toJSON();
 }
 
-test('summarizeModeChange of no recipes is empty', () => {
-  assert.deepEqual(summarizeModeChange([], 'simple', 'alchemy'), {
-    migrated: 0,
-    deleted: [],
-    droppedIngredientSets: [],
-    droppedFailureSets: [],
-  });
+const EMPTY_SUMMARY = Object.freeze({
+  migrated: 0,
+  deleted: [],
+  droppedIngredientSets: [],
+  droppedFailureSets: [],
+  inertTierLinks: 0,
+  needsSetup: 0,
+  inertLibrary: { counters: 0, actions: 0 },
+  incompleteAfter: 0,
+  multiStepOff: false,
+});
+
+test('summarizeModeChange of no recipes is empty, with every field present', () => {
+  for (const [from, to] of [
+    ['simple', 'alchemy'],
+    ['simple', 'iterative'],
+    ['iterative', 'simple'],
+    ['simple', 'simple'],
+  ]) {
+    assert.deepEqual(summarizeModeChange([], from, to), EMPTY_SUMMARY, `${from} → ${to}`);
+  }
 });
 
 test('summarizeModeChange counts, names the deleted, and lists dropped ingredient and failure sets', () => {
@@ -382,6 +396,7 @@ test('summarizeModeChange counts, names the deleted, and lists dropped ingredien
   assert.deepEqual(summary.droppedIngredientSets, [
     {
       recipe: 'Recipe A',
+      step: null,
       sets: [
         { name: 'Gold route', index: 1 },
         { name: undefined, index: 2 },
@@ -431,9 +446,516 @@ test('summarizeModeChange reads toJSON(), falls back to the id, and never mutate
 
   const summary = summarizeModeChange([plainObject, model], 'simple', 'alchemy');
 
-  assert.deepEqual(summary.droppedIngredientSets, [{ recipe: 'r-anon', sets: [{ name: undefined, index: 1 }] }]);
+  assert.deepEqual(summary.droppedIngredientSets, [
+    { recipe: 'r-anon', step: null, sets: [{ name: undefined, index: 1 }] },
+  ]);
   assert.equal(JSON.stringify(plainObject), snapshot);
   assert.equal(JSON.stringify(model.toJSON()), modelSnapshot);
   assert.deepEqual(summarizeModeChange([model], 'simple', 'progressive').droppedFailureSets, ['Model']);
   assert.equal(JSON.stringify(model.toJSON()), modelSnapshot);
+});
+
+// --- The 6×6 matrix (`resolution-modes` § Mode Invariant) -----------------------------------
+
+const LINE = { end: 'failure', rules: [] };
+const HEAT = [{ source: 'counter', counterId: 'heat', op: '>=', value: 3 }];
+
+/** The eight matrix fixtures, in the order every cell lists its outcomes. */
+const MATRIX_FIXTURES = {
+  oneByOne: () => ({
+    id: 'm-1x1',
+    ingredientSets: [{ id: 's-1' }],
+    resultGroups: [{ id: 'g-1', name: 'Default' }],
+  }),
+  flatMultiSet: () => ({
+    id: 'm-flat',
+    ingredientSets: [{ id: 's-1' }, { id: 's-2' }],
+    resultGroups: [
+      { id: 'g-1', name: 'Alpha' },
+      { id: 'g-2', name: 'Beta' },
+    ],
+  }),
+  stepTwoSets: () => ({
+    id: 'm-step-sets',
+    steps: [
+      { id: 'st-1', ingredientSets: [{ id: 's-1' }, { id: 's-2' }], resultGroups: [{ id: 'g-1', name: 'A' }] },
+      { id: 'st-2', ingredientSets: [{ id: 's-3' }], resultGroups: [{ id: 'g-2', name: 'B' }] },
+    ],
+  }),
+  stepSelection: () => ({
+    id: 'm-step-selection',
+    steps: [
+      {
+        id: 'st-1',
+        ingredientSets: [{ id: 's-1' }],
+        resultGroups: [{ id: 'g-1', name: 'A' }],
+        resultSelection: { provider: 'check' },
+      },
+    ],
+  }),
+  flatFailure: () => ({
+    id: 'm-flat-failure',
+    ingredientSets: [{ id: 's-1' }],
+    resultGroups: [
+      { id: 'g-ok', name: 'Default' },
+      { id: 'g-fail', role: 'failure' },
+    ],
+  }),
+  stepFailure: () => ({
+    id: 'm-step-failure',
+    steps: [
+      {
+        id: 'st-1',
+        ingredientSets: [{ id: 's-1' }],
+        resultGroups: [
+          { id: 'g-ok', name: 'A' },
+          { id: 'g-fail', role: 'failure', producedWhen: [] },
+        ],
+      },
+      { id: 'st-2', ingredientSets: [{ id: 's-2' }], resultGroups: [{ id: 'g-2', name: 'B' }] },
+    ],
+  }),
+  authoredLines: () => ({
+    id: 'm-lines',
+    resultGroups: [{ id: 'g-r', role: 'failure', producedWhen: [{ end: 'failure', rules: HEAT }] }],
+    steps: [
+      {
+        id: 'st-1',
+        ingredientSets: [{ id: 's-1' }],
+        resultGroups: [
+          { id: 'g-s', name: 'A', producedWhen: [{ end: 'success', rules: HEAT }] },
+          { id: 'g-sf', role: 'failure', producedWhen: [{ end: 'failure', rules: [] }] },
+        ],
+      },
+    ],
+  }),
+  tierLinks: () => ({
+    id: 'm-tiers',
+    resultSelection: { provider: 'check' },
+    resultGroups: [{ id: 'g-r', name: 'R', checkOutcomeIds: ['t-1'] }],
+    steps: [
+      {
+        id: 'st-1',
+        ingredientSets: [{ id: 's-1', resultGroupId: 'g-1' }],
+        resultGroups: [{ id: 'g-1', name: 'A', checkOutcomeIds: ['t-1', 't-2'] }],
+        outcomeRouting: { success: 'g-1' },
+        resultSelection: { provider: 'check' },
+      },
+      { id: 'st-2', ingredientSets: [{ id: 's-2' }], resultGroups: [{ id: 'g-2', name: 'B' }] },
+    ],
+  }),
+};
+
+/** The reshaped fixtures a cell names after its outcome; every other survivor is verbatim. */
+const RESHAPED = {
+  flatMultiSet: {
+    collapsed: {
+      id: 'm-flat',
+      ingredientSets: [{ id: 's-1' }],
+      resultGroups: [
+        { id: 'g-1', name: 'Alpha' },
+        { id: 'g-2', name: 'Beta' },
+      ],
+    },
+  },
+  stepTwoSets: {
+    iterative: {
+      id: 'm-step-sets',
+      steps: [
+        { id: 'st-1', ingredientSets: [{ id: 's-1' }], resultGroups: [{ id: 'g-1', name: 'A' }] },
+        { id: 'st-2', ingredientSets: [{ id: 's-3' }], resultGroups: [{ id: 'g-2', name: 'B' }] },
+      ],
+    },
+  },
+  stepSelection: {
+    iterative: {
+      id: 'm-step-selection',
+      steps: [
+        {
+          id: 'st-1',
+          ingredientSets: [{ id: 's-1' }],
+          resultGroups: [{ id: 'g-1', name: 'A' }],
+          resultSelection: null,
+        },
+      ],
+    },
+  },
+  flatFailure: {
+    iterative: {
+      id: 'm-flat-failure',
+      ingredientSets: [{ id: 's-1' }],
+      resultGroups: [
+        { id: 'g-ok', name: 'Default' },
+        { id: 'g-fail', role: 'failure', producedWhen: [LINE] },
+      ],
+    },
+    progressive: {
+      id: 'm-flat-failure',
+      ingredientSets: [{ id: 's-1' }],
+      resultGroups: [{ id: 'g-ok', name: 'Default' }],
+    },
+  },
+  stepFailure: {
+    iterative: {
+      id: 'm-step-failure',
+      steps: [
+        {
+          id: 'st-1',
+          ingredientSets: [{ id: 's-1' }],
+          resultGroups: [
+            { id: 'g-ok', name: 'A' },
+            { id: 'g-fail', role: 'failure', producedWhen: [LINE] },
+          ],
+        },
+        { id: 'st-2', ingredientSets: [{ id: 's-2' }], resultGroups: [{ id: 'g-2', name: 'B' }] },
+      ],
+    },
+  },
+  tierLinks: {
+    iterative: {
+      id: 'm-tiers',
+      resultSelection: null,
+      resultGroups: [{ id: 'g-r', name: 'R', checkOutcomeIds: ['t-1'] }],
+      steps: [
+        {
+          id: 'st-1',
+          ingredientSets: [{ id: 's-1', resultGroupId: 'g-1' }],
+          resultGroups: [{ id: 'g-1', name: 'A', checkOutcomeIds: ['t-1', 't-2'] }],
+          outcomeRouting: { success: 'g-1' },
+          resultSelection: null,
+        },
+        { id: 'st-2', ingredientSets: [{ id: 's-2' }], resultGroups: [{ id: 'g-2', name: 'B' }] },
+      ],
+    },
+    unselected: {
+      id: 'm-tiers',
+      resultSelection: null,
+      resultGroups: [{ id: 'g-r', name: 'R', checkOutcomeIds: ['t-1'] }],
+      steps: [
+        {
+          id: 'st-1',
+          ingredientSets: [{ id: 's-1', resultGroupId: 'g-1' }],
+          resultGroups: [{ id: 'g-1', name: 'A', checkOutcomeIds: ['t-1', 't-2'] }],
+          outcomeRouting: { success: 'g-1' },
+          resultSelection: { provider: 'check' },
+        },
+        { id: 'st-2', ingredientSets: [{ id: 's-2' }], resultGroups: [{ id: 'g-2', name: 'B' }] },
+      ],
+    },
+  },
+};
+
+// One `outcome` or `outcome:shape` per fixture, in `MATRIX_FIXTURES` order; `reconcile` is the
+// flag every outcome of a routed-target cell carries, absent elsewhere.
+const SAME = Array.from({ length: 8 }, () => 'lossless');
+const INTO_ITERATIVE = ['lossless', 'cleared:collapsed', 'cleared:iterative', 'cleared:iterative', 'cleared:iterative', 'cleared:iterative', 'lossless', 'cleared:iterative'];
+const INTO_ALCHEMY = ['lossless', 'cleared:collapsed', 'delete', 'lossless', 'lossless', 'delete', 'lossless', 'delete'];
+const INTO_SIMPLE = ['lossless', 'delete', 'delete', 'delete', 'lossless', 'delete', 'delete', 'delete'];
+const INTO_PROGRESSIVE = ['lossless', 'delete', 'delete', 'delete', 'cleared:progressive', 'delete', 'delete', 'delete'];
+const CLEARED_ROUTED = ['carry', 'carry', 'carry', 'carry', 'carry', 'carry', 'carry', 'cleared:unselected'];
+const CARRIED = Array.from({ length: 8 }, () => 'carry');
+
+const MATRIX = {
+  simple: {
+    simple: SAME,
+    routedByIngredients: { reconcile: false, cells: CLEARED_ROUTED },
+    routedByCheck: { reconcile: true, cells: CLEARED_ROUTED },
+    progressive: INTO_PROGRESSIVE,
+    alchemy: INTO_ALCHEMY,
+    iterative: INTO_ITERATIVE,
+  },
+  routedByIngredients: {
+    simple: INTO_SIMPLE,
+    routedByIngredients: SAME,
+    routedByCheck: { reconcile: true, cells: CARRIED },
+    progressive: INTO_PROGRESSIVE,
+    alchemy: INTO_ALCHEMY,
+    iterative: INTO_ITERATIVE,
+  },
+  routedByCheck: {
+    simple: INTO_SIMPLE,
+    routedByIngredients: { reconcile: true, cells: CARRIED },
+    routedByCheck: SAME,
+    progressive: INTO_PROGRESSIVE,
+    alchemy: INTO_ALCHEMY,
+    iterative: INTO_ITERATIVE,
+  },
+  progressive: {
+    simple: INTO_SIMPLE,
+    routedByIngredients: { reconcile: false, cells: CLEARED_ROUTED },
+    routedByCheck: { reconcile: true, cells: CLEARED_ROUTED },
+    progressive: SAME,
+    alchemy: INTO_ALCHEMY,
+    iterative: INTO_ITERATIVE,
+  },
+  alchemy: {
+    simple: INTO_SIMPLE,
+    routedByIngredients: { reconcile: false, cells: CLEARED_ROUTED },
+    routedByCheck: { reconcile: true, cells: CLEARED_ROUTED },
+    progressive: INTO_PROGRESSIVE,
+    alchemy: SAME,
+    iterative: INTO_ITERATIVE,
+  },
+  iterative: {
+    simple: INTO_SIMPLE,
+    routedByIngredients: { reconcile: true, cells: CARRIED },
+    routedByCheck: { reconcile: true, cells: CARRIED },
+    progressive: INTO_PROGRESSIVE,
+    alchemy: INTO_ALCHEMY,
+    iterative: SAME,
+  },
+};
+
+/** The `{ outcome, reconcile?, recipe }` a cell entry names for one fixture. */
+function expectedCell(code, name, reconcile) {
+  const [outcome, shape] = code.split(':');
+  let recipe = MATRIX_FIXTURES[name]();
+  if (outcome === 'delete') recipe = null;
+  else if (shape) recipe = RESHAPED[name][shape];
+  return { outcome, ...(reconcile !== undefined && { reconcile }), recipe };
+}
+
+test('the matrix names all 36 cells over six modes', () => {
+  assert.deepEqual(Object.keys(MATRIX), MODES);
+  for (const from of MODES) assert.deepEqual(Object.keys(MATRIX[from]), MODES, from);
+});
+
+for (const from of MODES) {
+  for (const to of MODES) {
+    test(`matrix ${from} → ${to} deep-equals its cell for every fixture`, () => {
+      const cell = MATRIX[from][to];
+      const codes = Array.isArray(cell) ? cell : cell.cells;
+      for (const [index, name] of Object.keys(MATRIX_FIXTURES).entries()) {
+        const { outcome, reconcile, recipe } = migrateRecipeForModeChange(
+          MATRIX_FIXTURES[name](),
+          from,
+          to,
+          SYSTEM_NO_CHECK
+        );
+        const actual = { outcome, ...(reconcile !== undefined && { reconcile }), recipe };
+        assert.deepEqual(actual, expectedCell(codes[index], name, cell.reconcile), name);
+      }
+    });
+  }
+}
+
+// One `reasons` literal per matrix row, so a swapped or reworded reason fails.
+const ROW_REASONS = [
+  ['simple', 'routedByCheck', 'oneByOne', ['no resultSelection to clear for routedByCheck mode', 'routing data must be re-authored for routedByCheck']],
+  ['routedByIngredients', 'routedByCheck', 'oneByOne', ['carried into routedByCheck; routing data must be re-authored for the new basis']],
+  ['routedByCheck', 'iterative', 'flatMultiSet', ['collapsed multiple ingredient sets to the first set for iterative mode']],
+  ['progressive', 'alchemy', 'stepTwoSets', ['multi-step recipe cannot be migrated into alchemy mode']],
+  ['alchemy', 'progressive', 'flatFailure', ['dropped the failure result set for progressive mode']],
+  ['iterative', 'routedByIngredients', 'oneByOne', ['carried into routedByIngredients; routing data must be re-authored for the new basis']],
+];
+
+for (const [from, to, name, reasons] of ROW_REASONS) {
+  test(`matrix row ${from} gives its literal reasons (${name} → ${to})`, () => {
+    assert.deepEqual(migrateRecipeForModeChange(MATRIX_FIXTURES[name](), from, to, SYSTEM_NO_CHECK).reasons, reasons);
+  });
+}
+
+test('a non-object recipe is carried', () => {
+  assert.deepEqual(migrateRecipeForModeChange(null, 'simple', 'iterative'), { outcome: 'carry', recipe: null, reasons: [] });
+});
+
+test('migrating into iterative is idempotent and deletes nothing from any source', () => {
+  const sources = MODES.filter((mode) => mode !== 'iterative');
+  const cases = sources.flatMap((from) => Object.values(MATRIX_FIXTURES).map((make) => [from, make]));
+  for (const [from, make] of cases) {
+    const first = migrateRecipeForModeChange(make(), from, 'iterative', SYSTEM_NO_CHECK);
+    assert.notEqual(first.outcome, 'delete');
+    const again = migrateRecipeForModeChange(structuredClone(first.recipe), from, 'iterative');
+    assert.equal(again.outcome, 'lossless', `${from}: ${first.recipe.id}`);
+  }
+});
+
+// --- Every summary field across a change into or out of iterative ---------------------------
+
+const { buildIterativeAuthoringFixture } = await import('./helpers/iterativeAuthoringFixture.js');
+const { buildRecipeList } = await import('../src/ui/svelte/stores/adminRecipeRowProjection.js');
+
+const set = (id) => ({
+  id,
+  name: id,
+  ingredientGroups: [{ id: `${id}-g`, options: [{ componentId: 'comp-ore', quantity: 1 }] }],
+});
+const made = (id, extra = {}) => ({
+  id,
+  name: 'Made',
+  results: [{ id: `${id}-ore`, componentId: 'comp-ore', quantity: 1 }],
+  ...extra,
+});
+
+/** Chain Link: step 1 one set and a success rule but no group, step 2 a group, a stale recipe group. */
+const chainLink = () => ({
+  id: 'iw-r-chain',
+  name: 'Chain Link',
+  iterative: { counters: [{ counterId: 'heat', start: 0, visible: true }] },
+  resultGroups: [made('chain-stale')],
+  steps: [
+    { id: 'chain-1', name: 'Forge', ingredientSets: [set('chain-1-set')], resultGroups: [], iterative: { success: HEAT } },
+    {
+      id: 'chain-2',
+      name: 'Join',
+      ingredientSets: [set('chain-2-set')],
+      resultGroups: [made('chain-made', { producedWhen: [{ end: 'success', rules: [] }] })],
+    },
+  ],
+});
+const completeRecipe = () => ({ id: 'r-plain', name: 'Plain', ingredientSets: [set('plain-set')], resultGroups: [made('plain-g')] });
+const emptyShell = () => ({ id: 'r-shell', name: 'Shell', ingredientSets: [], resultGroups: [] });
+const twoStepShield = () =>
+  structuredClone(buildIterativeAuthoringFixture().recipes.find((r) => r.id === 'recipe-forged-shield'));
+const iterativeSystem = () => buildIterativeAuthoringFixture().system;
+
+test('summarizeModeChange lists one dropped-set entry per (recipe, step) and counts inert tier links', () => {
+  const summary = summarizeModeChange(
+    [MATRIX_FIXTURES.flatMultiSet(), MATRIX_FIXTURES.stepTwoSets(), MATRIX_FIXTURES.tierLinks()],
+    'routedByCheck',
+    'iterative'
+  );
+  assert.deepEqual(summary.droppedIngredientSets, [
+    { recipe: 'm-flat', step: null, sets: [{ name: undefined, index: 1 }] },
+    { recipe: 'm-step-sets', step: 0, sets: [{ name: undefined, index: 1 }] },
+  ]);
+  assert.equal(summary.inertTierLinks, 3, 'one recipe-scope link and two on step 1');
+  assert.equal(summary.migrated, 3);
+  assert.deepEqual(summary.deleted, []);
+  const out = summarizeModeChange([MATRIX_FIXTURES.tierLinks()], 'iterative', 'routedByCheck');
+  assert.equal(out.inertTierLinks, 0, 'only a change into iterative counts tier links');
+});
+
+test('summarizeModeChange counts needsSetup into iterative only, and not for a two-set step', () => {
+  const system = { ...iterativeSystem(), resolutionMode: 'routedByCheck' };
+  const blade = buildIterativeAuthoringFixture().recipes.find((r) => r.id === 'recipe-tempered-blade');
+  const twoSets = { ...structuredClone(blade), ingredientSets: [set('a'), set('b')] };
+  assert.equal(summarizeModeChange([twoSets], 'routedByCheck', 'iterative', system).needsSetup, 0);
+  const unready = summarizeModeChange([completeRecipe(), twoSets], 'routedByCheck', 'iterative', system);
+  assert.equal(unready.needsSetup, 1, 'a recipe with no counter instances needs setup');
+  assert.equal(unready.incompleteAfter, 0, 'the into direction never counts incompleteAfter');
+  const out = summarizeModeChange([completeRecipe()], 'iterative', 'routedByCheck', iterativeSystem());
+  assert.equal(out.needsSetup, 0, 'the out direction never counts needsSetup');
+});
+
+test('summarizeModeChange reports the inert library leaving iterative, and zeros otherwise', () => {
+  const system = iterativeSystem();
+  assert.deepEqual(summarizeModeChange([], 'iterative', 'simple', system).inertLibrary, {
+    counters: 2,
+    actions: 2,
+  });
+  for (const [from, to] of [
+    ['simple', 'iterative'],
+    ['simple', 'alchemy'],
+    ['iterative', 'iterative'],
+  ]) {
+    assert.deepEqual(summarizeModeChange([], from, to, system).inertLibrary, { counters: 0, actions: 0 });
+  }
+});
+
+test('summarizeModeChange flags multiStepOff only into alchemy with Multi-step on', () => {
+  const on = { features: { multiStepRecipes: true } };
+  const off = { features: { multiStepRecipes: false } };
+  assert.equal(summarizeModeChange([], 'simple', 'alchemy', on).multiStepOff, true);
+  assert.equal(summarizeModeChange([], 'iterative', 'alchemy', on).multiStepOff, true);
+  assert.equal(summarizeModeChange([], 'simple', 'alchemy', off).multiStepOff, false);
+  assert.equal(summarizeModeChange([], 'simple', 'routedByCheck', on).multiStepOff, false);
+  assert.equal(summarizeModeChange([], 'simple', 'iterative', on).multiStepOff, false);
+  assert.equal(summarizeModeChange([], 'alchemy', 'alchemy', on).multiStepOff, false, 'no change, no flag');
+});
+
+const OUT_TARGETS = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
+
+test('incompleteAfter counts the survivors the target mode leaves incomplete', () => {
+  const system = iterativeSystem();
+  const count = (recipe, to) => summarizeModeChange([recipe], 'iterative', to, system).incompleteAfter;
+  const deleted = (recipe, to) => summarizeModeChange([recipe], 'iterative', to, system).deleted.length;
+  const counted = Object.fromEntries(OUT_TARGETS.map((to) => [to, count(chainLink(), to)]));
+  assert.deepEqual(counted, {
+    simple: 0,
+    routedByIngredients: 1,
+    routedByCheck: 1,
+    progressive: 0,
+    alchemy: 0,
+  });
+  for (const to of ['simple', 'progressive', 'alchemy']) {
+    assert.equal(deleted(chainLink(), to), 1, `the multi-step Chain Link is deleted out to ${to}`);
+  }
+  assert.equal(deleted(twoStepShield(), 'alchemy'), 1);
+  assert.equal(count(twoStepShield(), 'alchemy'), 0, 'a recipe the target deletes is not counted');
+  for (const to of OUT_TARGETS) {
+    assert.equal(count(completeRecipe(), to), 0, `a complete recipe out to ${to}`);
+    assert.equal(count(emptyShell(), to), 1, `the empty shell is counted out to ${to}`);
+  }
+  assert.equal(summarizeModeChange([chainLink()], 'routedByCheck', 'simple', system).incompleteAfter, 0);
+  for (const [from, to] of [['routedByCheck', 'iterative'], ['routedByCheck', 'routedByIngredients']]) {
+    assert.equal(summarizeModeChange([emptyShell()], from, to, system).incompleteAfter, 0, `${from} → ${to}`);
+  }
+});
+
+test("incompleteAfter equals the row projection's incomplete over the same migrated recipes", () => {
+  const system = iterativeSystem();
+  for (const to of OUT_TARGETS) {
+    const recipes = [chainLink(), completeRecipe(), emptyShell(), twoStepShield()];
+    const migrated = recipes
+      .map((recipe) => migrateRecipeForModeChange(structuredClone(recipe), 'iterative', to).recipe)
+      .filter(Boolean)
+      .map((json) => Recipe.fromJSON(structuredClone(json)));
+    const { recipes: rows } = buildRecipeList(null, {}, { ...system, resolutionMode: to }, '', {
+      roster: migrated,
+    });
+    assert.equal(
+      summarizeModeChange(recipes, 'iterative', to, system).incompleteAfter,
+      rows.filter((row) => row.incomplete).length,
+      to
+    );
+  }
+});
+
+test('summarizeModeChange from iterative to iterative counts nothing', () => {
+  const summary = summarizeModeChange([MATRIX_FIXTURES.tierLinks(), emptyShell()], 'iterative', 'iterative', iterativeSystem());
+  assert.equal(summary.inertTierLinks, 0);
+  assert.equal(summary.needsSetup, 0);
+  assert.equal(summary.incompleteAfter, 0);
+  assert.deepEqual(summary.inertLibrary, { counters: 0, actions: 0 });
+  assert.equal(summary.migrated, 2);
+});
+
+test('summarizeModeChange counts the inert counters and actions apart', () => {
+  const iterative = { counters: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }], actions: [{ id: 'a1' }] };
+  assert.deepEqual(summarizeModeChange([], 'iterative', 'simple', { iterative }).inertLibrary, { counters: 3, actions: 1 });
+});
+
+test('summarizeModeChange lists every dropped set of every scope, in step order', () => {
+  const three = (prefix) => [1, 2, 3].map((n) => ({ id: `${prefix}${n}`, name: `${prefix}${n}` }));
+  const recipe = {
+    id: 'multi',
+    name: 'Multi',
+    ingredientSets: three('f'),
+    steps: [
+      { id: 'st-1', ingredientSets: [{ id: 'a1', name: 'a1' }] },
+      { id: 'st-2', ingredientSets: three('b') },
+    ],
+  };
+  assert.deepEqual(summarizeModeChange([recipe], 'routedByCheck', 'iterative').droppedIngredientSets, [
+    { recipe: 'Multi', step: null, sets: [{ name: 'f2', index: 1 }, { name: 'f3', index: 2 }] },
+    { recipe: 'Multi', step: 1, sets: [{ name: 'b2', index: 1 }, { name: 'b3', index: 2 }] },
+  ]);
+});
+
+test('incompleteAfter judges a survivor under the target mode, progressive included', async () => {
+  const { seededRollClass, withRoll } = await import('./helpers/seededRoll.js');
+  const shell = () => ({
+    id: 'r-prog',
+    name: 'Prog',
+    craftingSystemId: 'sys-1',
+    metadata: { version: '1.0.0' },
+    ingredientSets: [],
+    resultGroups: [{ id: 'g', results: [{ id: 'res', componentId: 'item-A', quantityFormula: 'max(, 2)' }] }],
+  });
+  await withRoll(seededRollClass({ unparsable: ['max(, 2)'] }).Roll, () => {
+    const count = (to) => summarizeModeChange([shell()], 'iterative', to, {}).incompleteAfter;
+    assert.equal(count('progressive'), 1, 'progressive reads no formula, so only the missing set shows');
+    assert.equal(count('routedByCheck'), 0, 'elsewhere the unparsable formula makes the structure invalid');
+  });
 });

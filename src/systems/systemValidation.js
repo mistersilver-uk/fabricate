@@ -78,18 +78,19 @@ function projectRecipe(recipe, system) {
     resultGroups: asArray(raw.resultGroups),
     resultSelection: raw.resultSelection || null,
     toolIds: asArray(raw.toolIds),
-    incomplete: isRecipeIncomplete(recipe, raw, system?.resolutionMode === 'progressive'),
+    incomplete: isRecipeIncomplete(recipe, raw, system?.resolutionMode),
     structureKey: raw.structureKey,
   };
 }
 
 /**
- * A persistable but uncraftable shell, per the model's `validate()` and `validateStructure()` when
- * present, else a count-only fallback (the admin store's `_isRecipeIncomplete`).
+ * A persistable but uncraftable shell under `mode`, per the model's `validate()` and
+ * `validateStructure()` when present, else a count-only fallback (the admin store's
+ * `_isRecipeIncomplete`).
  */
-function isRecipeIncomplete(recipe, raw, progressive) {
+export function isRecipeIncomplete(recipe, raw, mode) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    const injected = { Roll: diceEngine(), progressive };
+    const injected = { Roll: diceEngine(), progressive: mode === 'progressive' };
     return (
       recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
     );
@@ -398,20 +399,6 @@ function collectSystemBlockers(system, recipes, components) {
         nav: { view: 'system-overview' },
       });
     }
-  }
-
-  // Alchemy attempts are single-step, so multi-step recipes left on break recipe authoring.
-  if (mode === 'alchemy' && features.multiStepRecipes === true) {
-    blockers.push({
-      kind: 'system',
-      entityId: null,
-      entityName: trimmed(system?.name) || system?.id || 'system',
-      severity: 'critical',
-      blocks: 'system',
-      code: 'multiStepInAlchemy',
-      message: 'Multi-step recipes cannot be used while the system is in alchemy mode.',
-      nav: { view: 'system-overview' },
-    });
   }
 
   // Simple or Tiered alchemy makes the check MANDATORY on its slot (`simple` or `routed`); None

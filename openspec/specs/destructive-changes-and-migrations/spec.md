@@ -17,6 +17,9 @@ Define destructive operations, required confirmations, clean-up behaviour, and m
 ### Change Crafting System Resolution Mode
 
 A resolution-mode change is **migration-first**, not delete-all.
+A change into or out of `iterative` is refused, with nothing written, while the system has an active crafting run: `CraftingSystemManager.updateSystem` throws an `Error` with `reason: 'modeChangeRunsActive'`, `count` and `direction`, and the admin store notifies its message.
+The count covers the cached active runs of world actors, and is a check, not a lock: Foundry has no transaction and a write is invisible until acknowledged, so a start whose run is not yet written, a start acknowledged after the count but before the system write lands, a player client not yet on the new mode, and a start during the recipe migration that follows the system write are not counted.
+A run stranded that way is recovered by cancel, which reads no mode and refunds it.
 When `CraftingSystem.resolutionMode` changes:
 
 1. Require explicit GM confirmation.
@@ -26,8 +29,9 @@ When `CraftingSystem.resolutionMode` changes:
 2. Persist the merged system (with its new mode) before migrating recipes, so recipe migration and validation read the new mode.
 3. For each recipe in the system, migrate it to fit the new mode per the migratability matrix in `resolution-modes/spec.md § Mode Invariant` (clear the routed selection, collapse a multi-ingredient-set recipe into alchemy, drop the reserved failure result set when moving into progressive, or carry it verbatim).
    Migrating *into* `alchemy` seeds NO per-recipe provider (retired, issue 554): it clears any `resultSelection` and collapses a multi-INGREDIENT-SET recipe to its first set; the system-level `alchemy.checkMode` is seeded separately (defaults to `none`).
+   Migrating into `iterative` collapses each step to its first ingredient set and seeds each reserved failure group with no `producedWhen` with `{ end: 'failure', rules: [] }`.
    Migrated recipes are persisted on structural validity alone.
-4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met: narrowing into `simple`/`progressive` from a recipe that is not 1×1, or moving a multi-STEP recipe into `alchemy` (a multi-INGREDIENT-SET recipe is collapsed, not deleted).
+4. Delete a recipe only when a per-recipe *structural* constraint of the target mode cannot be met: narrowing into `simple`/`progressive` from a recipe that is not 1×1 (a recipe with explicit steps is never 1×1), or moving a multi-STEP recipe into `alchemy` (a multi-INGREDIENT-SET recipe is collapsed, not deleted).
 5. System-level gaps other than alchemy signature collisions (for example a target mode whose required check is unconfigured) never delete or disable a recipe here; they are surfaced as system-validation issues that gate visibility (see `recipe-visibility`), not deletions.
    An alchemy signature collision is the exception, handled by item 7 below: migrating *into* `alchemy` disables (`enabled = false`) the colliding recipes rather than deleting them or hard-blocking the switch.
    Migrating into routed `check` seeds the provider but does NOT author outcome tiers or mark any tier `success`, so a migrated routed system produces no result until a GM authors at least one Success outcome tier and routes a result group to it; this is surfaced as a validation issue, never auto-healed.
@@ -1442,6 +1446,7 @@ The `1.7.0` migration (`src/migration/migrateBreakToolsOnFail.js`) is pure, idem
 ## Testing Requirements
 
 - Unit tests for each destructive operation clean-up path.
+- Unit tests for the 6×6 matrix, the round trips into and out of `iterative`, and the active-run refusal.
 - Unit tests for idempotent migration behaviour: running a migration twice on the same data produces identical results.
 - Unit tests for fatal migration abort: unusable-document failure aborts the pass, no partial data is persisted, and `migrationVersion` remains unchanged.
 - Unit tests for rollback behaviour: data after abort equals the last known-good checkpoint.

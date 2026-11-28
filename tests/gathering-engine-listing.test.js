@@ -1430,8 +1430,8 @@ test('getTaskDropBreakdown returns empty drops when richState has no previewDrop
 const blockedGatheringSystem = {
   id: 'system-a',
   enabled: true,
-  features: { gathering: true, multiStepRecipes: true },
-  resolutionMode: 'alchemy',
+  features: { gathering: true },
+  resolutionMode: 'routedByCheck',
   components: []
 };
 

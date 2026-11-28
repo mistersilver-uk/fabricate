@@ -180,14 +180,12 @@ A bundle above the current schema, written by a newer build, still takes the leg
 It is idempotent, because a second pass finds the mark already non-empty and returns at the same test that made it so.
 
 `CompendiumImporter.importFromPackData`, which file and pack imports both reach, MUST refuse an export it cannot read before any write or progress toast, right after its GM gate.
-It refuses a system whose `resolutionMode` names a known mode outside the selectable set (`reason: 'resolutionModeUnavailable'`), and one whose `iterative.version` is above the build's (`reason: 'iterativeVersionUnsupported'`).
-The refusal is an `Error` whose `message` is plain English that never shows the `reason` code:
+It refuses a system whose `iterative.version` is above the build's (`reason: 'iterativeVersionUnsupported'`).
+The refusal is an `Error` whose `message` is plain English that never shows the `reason` code: "This export's iterative settings were made by a newer version of Fabricate."
+No mode, legacy alias or unknown token is refused, and each normalizes as before.
 
-- `resolutionModeUnavailable`: "This export uses the Iterative resolution mode, which this version of Fabricate cannot import yet."
-- `iterativeVersionUnsupported`: "This export's iterative settings were made by a newer version of Fabricate."
-
-`options.selectableModes` injects the selectable set, and it defaults to `SELECTABLE_RESOLUTION_MODES` (`resolution-modes` § Iterative Mode Availability).
-A legacy alias and an unknown token are not refused, and normalize as before.
+An overwrite import that would move an existing system into or out of `iterative` while it has an active crafting run is refused by `updateSystem`, writes no system or recipe, and rethrows that refusal.
+The character-library and world-scope roster merges that precede the system write are kept.
 
 ### Currency configuration merge on import
 
@@ -485,9 +483,8 @@ Under COPY mode, and scoped to a SEEDED destination because the seeding gate mak
 
 After ANY import, every membership record the import wrote MUST name the DESTINATION's system id.
 
-A keep-mode `export → import → export` of an `iterative` system, with the full mode set injected through `options.selectableModes`, MUST be equivalent modulo the volatile fields.
+A keep-mode `export → import → export` of an `iterative` system MUST be equivalent modulo the volatile fields.
 Each iterative key on both exports MUST equal its authored value, and re-normalizing the second export through `_normalizeSystem` and `Recipe.fromJSON().toJSON()` MUST change none of them.
-Under the default selectable set the same payload is refused (§ Migration of older exports).
 
 `Component.complications` MUST round-trip under keep mode in full, macro uuids included, and an ABSENT `complications` MUST stay absent — absence and an empty list are the same state by `data-models/spec.md` § Component requirement 20, so a round trip that materialized an empty array would be inventing a key the normalizer refuses to write.
 

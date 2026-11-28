@@ -4,6 +4,7 @@
  * sub-configs. Internal to that aggregate — a private continuation of the `_normalizeSystem`
  * chokepoint, reached only through the manager, so nothing else imports it.
  */
+import { resolveResolutionModeAlias } from '../resolutionModeAvailability.js';
 
 export function normalizeFeatures(system = {}) {
   const features = system.features || {};
@@ -12,11 +13,15 @@ export function normalizeFeatures(system = {}) {
   // derives from resolution mode, not a persistent flag. It survives ONLY as a
   // legacy compatibility INPUT that seeds `multiStepRecipes` for old systems
   // saved before the rename; it is no longer emitted as a normalized feature.
-  const multiStepEnabled = has('multiStepRecipes')
+  const authoredMultiStep = has('multiStepRecipes')
     ? features.multiStepRecipes === true
     : has('complexRecipes')
       ? features.complexRecipes === true
       : false;
+  // Alchemy has no multi-step recipes, so the clamp reads the raw mode through its alias: this
+  // runs before the resolution mode is normalized (`resolution-modes` § Validation).
+  const multiStepEnabled =
+    authoredMultiStep && resolveResolutionModeAlias(system.resolutionMode) !== 'alchemy';
   return {
     recipeCategories: true,
     // Transitional alias

@@ -509,13 +509,13 @@ test('startAttempt rejects disabled gathering systems before record guards', asy
 });
 
 // A `blocks: 'system'` gathering system (issue 429): gathering is ENABLED, so it passes the
-// pre-existing features.gathering guard, but multi-step recipes left on in alchemy mode is a
-// structural system-validation blocker (needs no recipes to fire).
+// pre-existing features.gathering guard, but `routedByCheck` with no routed crafting-check formula
+// is a structural system-validation blocker (needs no recipes to fire).
 const blockedGatheringSystem = {
   id: 'system-a',
   enabled: true,
-  features: { gathering: true, multiStepRecipes: true },
-  resolutionMode: 'alchemy',
+  features: { gathering: true },
+  resolutionMode: 'routedByCheck',
   components: [],
   gatheringCraftingCheck: routedSystemCheck()
 };

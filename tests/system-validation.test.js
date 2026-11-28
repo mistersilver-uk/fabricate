@@ -584,16 +584,14 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
     );
   });
 
-  it('multi-step recipes left on in alchemy mode', () => {
+  it('alchemy with Multi-step on raises no multiStepInAlchemy', () => {
     const system = makeSystem({
       resolutionMode: 'alchemy',
       features: { multiStepRecipes: true },
     });
     const report = evaluateSystemValidation(system, { recipes: [] });
-    assert.equal(report.blocksSystem, true);
-    const blocker = report.issues.find((issue) => issue.code === 'multiStepInAlchemy');
-    assert.ok(blocker);
-    assert.equal(blocker.blocks, 'system');
+    assert.equal(report.blocksSystem, false);
+    assert.ok(report.issues.every((issue) => issue.code !== 'multiStepInAlchemy'));
   });
 
   it('alchemy ingredient-signature collision (subsumes #99)', () => {
@@ -713,10 +711,7 @@ describe('computeSystemVisibility', () => {
   });
 
   it('reports blocksSystem true for a structural system gap', () => {
-    const system = makeSystem({
-      resolutionMode: 'alchemy',
-      features: { multiStepRecipes: true },
-    });
+    const system = makeSystem({ resolutionMode: 'routedByCheck' });
     const { blocksSystem } = computeSystemVisibility(system, {});
     assert.equal(blocksSystem, true);
   });

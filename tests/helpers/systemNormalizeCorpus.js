@@ -207,6 +207,27 @@ function systemFieldScenarios() {
       alternatives: [{ features: { salvage: true } }],
     },
     { member: '_normalizeFeatures', name: 'featuresEssencesFromSystemFlag', args: [{ enableEssences: true }] },
+    // Alchemy clamps Multi-step off, a legacy `complexRecipes` seed included; no other mode does.
+    {
+      member: '_normalizeFeatures',
+      name: 'alchemyMultiStepClamped',
+      args: [{ resolutionMode: 'alchemy', features: { multiStepRecipes: true } }],
+    },
+    {
+      member: '_normalizeFeatures',
+      name: 'alchemyLegacyComplexClamped',
+      args: [{ resolutionMode: 'alchemy', features: { complexRecipes: true } }],
+    },
+    {
+      member: '_normalizeFeatures',
+      name: 'simpleMultiStepKept',
+      args: [{ resolutionMode: 'simple', features: { multiStepRecipes: true } }],
+    },
+    {
+      member: '_normalizeFeatures',
+      name: 'iterativeMultiStepKept',
+      args: [{ resolutionMode: 'iterative', features: { multiStepRecipes: true } }],
+    },
 
     { member: '_normalizeVisibilityMode', name: 'visibilityModeGlobal', args: ['global'] },
     {

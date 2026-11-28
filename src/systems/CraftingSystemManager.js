@@ -65,6 +65,7 @@ import {
   replaceItemSource,
   resolveImportedComponentSourceData,
 } from './manager/itemSources.js';
+import { prepareModeChange } from './manager/resolutionModeChange.js';
 import {
   resolveStoreCorpus as _resolveStoreCorpus,
   resolveStoreSeam as _resolveStoreSeam,
@@ -204,18 +205,6 @@ function _idSet(...lists) {
   }
   return ids;
 }
-
-const PASS_FAIL_CARRIED_FIELDS = Object.freeze([
-  'dc',
-  'thresholdMode',
-  'tiers',
-  'dcMode',
-  'macroUuid',
-  'checkBreakage',
-  'evaluation',
-  'offerSituationalBonus',
-  'advantage',
-]);
 
 export class CraftingSystemManager {
   /** `seams` injects the Foundry-facing collaborators (issue 800), each defaulting to a safe
@@ -1113,10 +1102,11 @@ export class CraftingSystemManager {
       this._assertNoAlchemySignatureCollisions(merged);
     }
 
-    // Move the check config between the `simple` and `routed` slots when the mode crosses the
-    // `routedByIngredients` boundary, before the first persist; fills only an unauthored slot.
     if (resolutionModeChanged) {
-      this._reconcileCraftingCheckSlotsForModeChange(merged, fromMode, toMode);
+      prepareModeChange(merged, fromMode, toMode, {
+        runManager: this._getCraftingRunManager(),
+        actors: globalThis.game?.actors,
+      });
     }
 
     // Persist first so recipe migration and validation read the new mode.
@@ -1142,8 +1132,7 @@ export class CraftingSystemManager {
       );
     }
 
-    // Disclose by name the components whose surplus Simple-mode groups the clamp dropped
-    // (issue 764), since the clamp itself is silent.
+    // Name the components whose surplus Simple-mode groups the silent clamp dropped (issue 764).
     const droppedSalvageComponents = this._detectDroppedSimpleSalvageGroups(mergedInput, merged);
     if (droppedSalvageComponents.length > 0) {
       const names = droppedSalvageComponents.join(', ');
@@ -1170,39 +1159,6 @@ export class CraftingSystemManager {
       await this._cleanupCraftingPreferences({ subject: 'a resolution-mode change' });
     }
     return merged;
-  }
-
-  /** Move the check config between the `simple` and `routed` slots when a mode crosses the
-   * `routedByIngredients` boundary, like the 1.10.0 migration; only an unauthored destination is
-   * filled. `dcMode`/`macroUuid` travel too (issue 1096). */
-  _reconcileCraftingCheckSlotsForModeChange(merged, fromMode, toMode) {
-    const check = merged?.craftingCheck;
-    if (!check || typeof check !== 'object') return;
-
-    if (toMode === 'routedByIngredients' && fromMode !== 'routedByIngredients') {
-      this._copyPassFailCheckFields(check.routed, check.simple);
-    } else if (fromMode === 'routedByIngredients' && toMode === 'routedByCheck') {
-      this._copyPassFailCheckFields(check.simple, check.routed);
-    }
-  }
-
-  /** Copy the pass/fail check fields to a destination only when it has no `rollFormula` and the
-   * source does, including `dcMode`/`macroUuid` (issue 1096), the evaluation, the offer and the
-   * advantage rule. */
-  _copyPassFailCheckFields(source, destination) {
-    if (!source || typeof source !== 'object' || !destination || typeof destination !== 'object') {
-      return;
-    }
-    const sourceFormula = typeof source.rollFormula === 'string' ? source.rollFormula.trim() : '';
-    if (sourceFormula.length === 0) return;
-    const destFormula =
-      typeof destination.rollFormula === 'string' ? destination.rollFormula.trim() : '';
-    if (destFormula.length > 0) return;
-
-    destination.rollFormula = source.rollFormula;
-    for (const key of PASS_FAIL_CARRIED_FIELDS) {
-      if (key in source) destination[key] = structuredClone(source[key]);
-    }
   }
 
   /** Migrate a system's recipes to a changed mode: migratable ones in place, the rest deleted, one

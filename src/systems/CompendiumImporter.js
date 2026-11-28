@@ -232,7 +232,7 @@ export class CompendiumImporter {
     if (!this._isGM()) {
       throw new Error('Only a GM can import a crafting system (world-scope write).');
     }
-    const modeRefusal = importModeRefusal(packData.system, options.selectableModes);
+    const modeRefusal = importModeRefusal(packData.system);
     if (modeRefusal) throw modeRefusal;
 
     const {

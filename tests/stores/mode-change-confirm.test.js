@@ -112,6 +112,29 @@ describe('modeChangeConfirmContent', () => {
     ]);
   });
 
+  it('counts recipes, not scopes, when one recipe loses sets on several steps', () => {
+    const html = modeChangeConfirmContent(
+      summary({
+        migrated: 2,
+        droppedIngredientSets: [
+          { recipe: 'Multi', step: 0, sets: [{ name: 'a2', index: 1 }] },
+          { recipe: 'Multi', step: 1, sets: [{ name: 'b2', index: 1 }] },
+          { recipe: 'Solo', step: null, sets: [{ name: 's2', index: 1 }] },
+        ],
+      }),
+      'iterative',
+      english
+    );
+    assert.ok(paragraphs(html)[1].startsWith('<p>2 recipe(s) will keep only'));
+  });
+
+  it('labels the iterative mode with its localized name', () => {
+    const labels = { 'FABRICATE.Admin.SystemSettings.ResolutionIterative': 'Iterative' };
+    const localize = (key, data) => labels[key] ?? echo(key, data);
+    const html = modeChangeConfirmContent(summary({ migrated: 1 }), 'iterative', localize);
+    assert.ok(html.includes('"mode":"Iterative"'));
+  });
+
   it('falls back to the mode id when the mode has no label', () => {
     const html = modeChangeConfirmContent(summary({ migrated: 1 }), 'customMode', echo);
     assert.ok(html.includes('"mode":"customMode"'));
