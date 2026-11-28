@@ -269,13 +269,17 @@ function held(fault) {
   return (read) => fault(read) === null;
 }
 
-/** A charm stack at a stored quantity of 0 or less, or a stack `before` held that is gone. */
+/** A charm stack at a stored quantity of 0 or less, or a stack `before` held that is gone or fell. */
 export function ledgerFault(before, read) {
   const spent = read.charmStacks.find(({ quantity: q }) => Number.isFinite(q) && q <= 0);
   if (spent) return `charm stack ${spent.id} stores quantity ${spent.quantity}`;
-  const ids = new Set(read.charmStacks.map(({ id }) => id));
-  const gone = before.charmStacks.find(({ id }) => !ids.has(id));
-  return gone ? `charm stack ${gone.id} vanished` : null;
+  const now = new Map(read.charmStacks.map(({ id, quantity }) => [id, quantity]));
+  const gone = before.charmStacks.find(({ id }) => !now.has(id));
+  if (gone) return `charm stack ${gone.id} vanished`;
+  const fell = before.charmStacks.find(
+    ({ id, quantity: q }) => Number.isFinite(q) && Number.isFinite(now.get(id)) && q > now.get(id)
+  );
+  return fell ? `charm stack ${fell.id} fell from ${fell.quantity} to ${now.get(fell.id)}` : null;
 }
 
 /** What the stage step asserts of its read after the craft; null when all of it holds. */

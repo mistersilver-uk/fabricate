@@ -1,7 +1,7 @@
 /**
  * The award-choice smoke's settled reads (issue 3025): a poll returns only once every condition
  * its step asserts holds, a negative check holds across its dwell, and the charm ledger fails a
- * stack stored at 0 or less and a pre-step stack that is gone.
+ * stack stored at 0 or less and a pre-step stack that is gone or fell.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -143,6 +143,7 @@ const PICK_CASES = [
     (read) => (read.charmStacks = [stack('c2', 3), stack('c3', 1), stack('c4', 1)]),
     'charm stack c1 vanished',
   ],
+  ['pre-pick stack fell', (read) => (read.charmStacks[1].quantity = 2), 'c2 fell from 3 to 2'],
 ];
 
 const stageHolds = (read) => stageFault(STAGE_BEFORE, read) === null;
@@ -253,5 +254,17 @@ describe('the charm ledger', () => {
   it('leaves an unquantified stack and a positive one alone', () => {
     const read = { charmStacks: [stack('c1', null), stack('c2', 2)] };
     assert.equal(ledgerFault({ charmStacks: [stack('c1', 1)] }, read), null);
+  });
+
+  it('names a surviving stack whose stored quantity fell', () => {
+    const before = { charmStacks: [stack('c1', 1), stack('c2', 2)] };
+    const read = { charmStacks: [stack('c1', 1), stack('c2', 1)] };
+    assert.equal(ledgerFault(before, read), 'charm stack c2 fell from 2 to 1');
+  });
+
+  it('passes an unchanged stack and a rising one', () => {
+    const before = { charmStacks: [stack('c1', 1), stack('c2', 2)] };
+    const read = { charmStacks: [stack('c1', 1), stack('c2', 3)] };
+    assert.equal(ledgerFault(before, read), null);
   });
 });
