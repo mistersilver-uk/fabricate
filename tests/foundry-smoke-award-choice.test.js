@@ -263,7 +263,7 @@ describe('readSettled, negative with a dwell', () => {
 describe('settlePick', () => {
   const fault = (read) => pickFault(STAGED_READ, STAGED, read);
 
-  it('names a late extra award after the pick holds at the pick, not the replay', BOUNDED, async () => {
+  it('a late extra award after the pick holds is named at the pick', BOUNDED, async () => {
     const extra = broken(PICKED_READ, (r) => {
       r.charms = 6;
       r.charmStacks.push(stack('c4', 1));
