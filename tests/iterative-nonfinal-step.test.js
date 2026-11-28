@@ -19,8 +19,10 @@ const { isIncompleteByCounts } = await import('../src/systems/recipeValidation.j
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { evaluateSystemValidation, isRecipeIncomplete } =
   await import('../src/systems/systemValidation.js');
+const { stripComponentsFromRecipes } = await import('../src/systems/manager/deleteCascades.js');
 const { evaluateRecipeReadiness } =
   await import('../src/ui/svelte/apps/manager/recipe/recipeReadiness.js');
+const { describeComponentDeleteImpact } = await import('../src/utils/recipeComponentReferences.js');
 
 /** The lab's Chain Link: step 1 has no result set, step 2 has one, and a stale recipe-level group. */
 function chainLink() {
@@ -170,5 +172,45 @@ describe('the chain migrated out of iterative', () => {
     const activation = manager.canActivateRecipe(recipe);
     assert.equal(activation.valid, false, 'enableBlocked');
     assert.ok(activation.issues.some((issue) => issue.code === 'stepMissingResultGroup'));
+  });
+});
+
+describe('a component delete that leaves step 1 with no result set', () => {
+  /** Chain Link whose step 1 also accepts a steel blade, and a cascade over it under `mode`. */
+  async function deleteAlternative(mode) {
+    const { system, chain } = chainLink();
+    chain.steps[0].ingredientSets[0].ingredientGroups[0].options.push({
+      componentId: 'iw-steel-blade',
+      quantity: 1,
+    });
+    const routed = { ...system, resolutionMode: mode };
+    const stored = new Map([[chain.id, chain]]);
+    const io = {
+      getSystem: () => routed,
+      recipeManager: () => ({
+        getRecipes: () => [...stored.values()],
+        updateRecipe: async (id, json) => stored.set(id, json),
+        save: async () => {},
+        notifyRecipesChanged: () => {},
+      }),
+    };
+    const ids = new Set(['iw-steel-blade']);
+    const impact = describeComponentDeleteImpact([...ids], [chain], mode);
+    const outcome = await stripComponentsFromRecipes(io, system.id, ids);
+    return { impact, outcome, enabled: stored.get(chain.id).enabled };
+  }
+
+  it('leaves Chain Link enabled in iterative', async () => {
+    const { impact, outcome, enabled } = await deleteAlternative('iterative');
+    assert.equal(enabled, true);
+    assert.equal(outcome.recipesDisabled, 0);
+    assert.equal(impact.recipesDisabled, 0, 'the impact statement agrees');
+  });
+
+  it('clamps it under routedByCheck, where step 1 needs a set', async () => {
+    const { impact, outcome, enabled } = await deleteAlternative('routedByCheck');
+    assert.equal(enabled, false);
+    assert.equal(outcome.recipesDisabled, 1);
+    assert.equal(impact.recipesDisabled, 1, 'the impact statement agrees');
   });
 });
