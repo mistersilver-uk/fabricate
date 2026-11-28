@@ -208,7 +208,8 @@ async function readWorld(page, { crafterId, recipeId, loreId, charmName }) {
           quantity: item._source.system?.quantity ?? null,
           compendiumSource: item._stats?.compendiumSource ?? null,
           duplicateSource: item._stats?.duplicateSource ?? null,
-          // The stored flag, read past any accessor a release lays over a migrated `sourceId`.
+          // Core migrates a stored sourceId into _stats.compendiumSource; the descriptor read
+          // never runs a getter.
           sourceId:
             Object.getOwnPropertyDescriptor(item._source.flags?.core ?? {}, 'sourceId')?.value ??
             null,
