@@ -51,6 +51,7 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/RoutingOverview.svelte',
     CARD,
   ],

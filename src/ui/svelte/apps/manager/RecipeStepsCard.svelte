@@ -15,6 +15,7 @@
 <script>
   import Callout from '../../components/Callout.svelte';
   import Field from '../../components/Field.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { fill } from '../../../../utils/fillPlaceholders.js';
   import RecipeStepAccordion from './recipe/RecipeStepAccordion.svelte';
@@ -56,27 +57,19 @@
   <IterativeStepIssueChip {issues} {index} stepName={stepName(step, index)} {text} />
 {/snippet}
 
-<section class="manager-recipe-steps-card manager-recipe-steps" data-recipe-section="steps">
-  <div class="manager-recipe-steps-card-head">
-    <div>
-      <h3 class="manager-recipe-section-title">
-        {iterative
-          ? text('FABRICATE.Admin.Manager.Recipe.Iterative.StepsHeading', 'Steps')
-          : text('FABRICATE.Admin.Manager.Recipe.StepDurations', 'Step durations')}
-      </h3>
-      <p class="manager-muted">
-        {iterative
-          ? text(
-              'FABRICATE.Admin.Manager.Recipe.Iterative.StepsHint',
-              'Steps are worked in order. Each ends by its own success and failure rules.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Recipe.StepDurationsHint',
-              'Each step takes its own time; they craft in sequence. Set the ingredients per step on the Ingredients tab.'
-            )}
-      </p>
-    </div>
-  </div>
+<InspectorCard class="manager-recipe-steps-card manager-recipe-steps" data-recipe-section="steps">
+  {#snippet title()}{iterative
+      ? text('FABRICATE.Admin.Manager.Recipe.Iterative.StepsHeading', 'Steps')
+      : text('FABRICATE.Admin.Manager.Recipe.StepDurations', 'Step durations')}{/snippet}
+  {#snippet note()}{iterative
+      ? text(
+          'FABRICATE.Admin.Manager.Recipe.Iterative.StepsHint',
+          'Steps are worked in order. Each ends by its own success and failure rules.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Recipe.StepDurationsHint',
+          'Each step takes its own time; they craft in sequence. Set the ingredients per step on the Ingredients tab.'
+        )}{/snippet}
 
   {#if multiStepOff}
     <Callout
@@ -166,7 +159,7 @@
       </div>
     {/snippet}
   </RecipeStepAccordion>
-</section>
+</InspectorCard>
 
 {#snippet footer()}
   <li class="manager-recipe-steps-add">

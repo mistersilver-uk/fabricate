@@ -497,53 +497,12 @@
   color: var(--fab-text-secondary);
 }
 
-/* Section title reused by the Duration and Step-durations cards (serif, no h3 card-heading chrome). */
+/* The Tools tab's section title (serif, no h3 card-heading chrome); every other Overview card titles itself through `InspectorCard`. */
 .fabricate-manager .manager-recipe-section-title {
   margin: 0;
   font-family: var(--fab-font-serif);
   font-size: 0.95rem;
   font-weight: 600;
-}
-
-/* The Overview cards. `manager-recipe-step-mode-card` joined this list in issue 676 when Step mode was rehomed out of the deleted context rail: it sits directly above the card it governs (steps or duration), so it SHARES their rule rather than hand-rolling a near-copy that would drift the moment either is retuned. */
-.fabricate-manager .manager-recipe-duration-card,
-.fabricate-manager .manager-recipe-steps-card,
-.fabricate-manager .manager-recipe-step-mode-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  padding: var(--fab-space-4);
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
-  background: var(--fab-surface-soft);
-}
-
-/* Step mode's copy block and its control sit side by side, like the duration card's copy + pill — but the control is a real segmented control, so it keeps its intrinsic width instead of stretching. */
-.fabricate-manager .manager-recipe-step-mode-card {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.fabricate-manager .manager-recipe-step-mode-card > div {
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-step-mode-card p {
-  margin: var(--fab-space-2xs) 0 0;
-}
-
-.fabricate-manager .manager-recipe-duration-card-head,
-.fabricate-manager .manager-recipe-steps-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-recipe-duration-card-head p,
-.fabricate-manager .manager-recipe-steps-card-head p {
-  margin: var(--fab-space-2xs) 0 0;
 }
 
 .fabricate-manager .manager-recipe-duration-pill {
