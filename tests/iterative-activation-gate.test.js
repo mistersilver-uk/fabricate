@@ -301,6 +301,35 @@ describe('an import stores a not-ready recipe disabled', () => {
     assert.equal(moved.recipeManager.getRecipe(ITERATIVE_MULTI_RECIPE_ID).enabled, false);
   });
 
+  it('an overwrite judges the record it stores, so a ready copy keeps its enabled flag', async () => {
+    const { shield } = shieldWorld();
+    const iterative = structuredClone(shield.iterative);
+    iterative.counters.push({ counterId: 'ember', start: 0, visible: true });
+    const ready = shieldWorld({ stored: { iterative, enabled: true } });
+    assert.equal(ready.recipeManager.canActivateRecipe(ITERATIVE_MULTI_RECIPE_ID).valid, true);
+    // The payload alone has no Counter Instances, so it is not ready; the merged record is.
+    const { iterative: _iterative, enabled: _enabled, ...payload } = structuredClone(shield);
+    const summary = await importerOf(ready).importFromPackData(packOf(ready, payload), {
+      overwriteExisting: true,
+    });
+    assert.deepEqual(summary.recipes.errors, []);
+    assert.equal(ready.recipeManager.getRecipe(ITERATIVE_MULTI_RECIPE_ID).enabled, true);
+  });
+
+  it('a system import outside iterative never runs the activation check', async () => {
+    const routed = shieldWorld({ mode: 'routedByCheck' });
+    routed.manager.systems.clear();
+    let checks = 0;
+    const canActivate = routed.recipeManager.canActivateRecipe.bind(routed.recipeManager);
+    routed.recipeManager.canActivateRecipe = (recipe) => {
+      checks += 1;
+      return canActivate(recipe);
+    };
+    const flat = { ...structuredClone(routed.shield), steps: [routed.shield.steps[0]] };
+    await importerOf(routed).importFromPackData(packOf(routed, flat));
+    assert.equal(checks, 0);
+  });
+
   it('a keep-mode round trip is equivalent modulo that enabled flag', async () => {
     const fixture = buildIterativeAuthoringFixture();
     const shield = fixture.recipes.find((entry) => entry.id === ITERATIVE_MULTI_RECIPE_ID);

@@ -245,7 +245,6 @@ export class CompendiumImporter {
 
     const systemData = packData.system;
     const recipesData = Array.isArray(packData.recipes) ? packData.recipes : [];
-
     const summary = createImportSummary(systemData, recipesData);
 
     // A fresh reporter per RUN, since the default carries per-toast state.
@@ -338,7 +337,7 @@ export class CompendiumImporter {
 
       // --- Phase 4: Import recipes ---
       // Each recipe writes the map only (`persist: false`) and fails alone; ONE `save()` follows.
-      const totalRecipes = recipesData.length;
+      const iterative = system.resolutionMode === 'iterative';
       let processedRecipes = 0;
       for (const recipeData of recipesData) {
         const resolved = {
@@ -361,12 +360,13 @@ export class CompendiumImporter {
             resolution: 'skipped',
           });
           processedRecipes++;
-          this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
+          this._maybeEmitRecipeProgress(processedRecipes, recipesData.length);
           continue;
         }
 
         try {
-          if (onlyIterativeNotReady(this._recipeManager.canActivateRecipe?.(resolved)))
+          const merged = iterative && { ...existing?.toJSON(), ...resolved };
+          if (merged && onlyIterativeNotReady(this._recipeManager.canActivateRecipe?.(merged)))
             resolved.enabled = false;
           if (existing && overwriteExisting) {
             await this._recipeManager.updateRecipe(resolved.id, resolved, {
@@ -397,7 +397,7 @@ export class CompendiumImporter {
         }
 
         processedRecipes++;
-        this._maybeEmitRecipeProgress(processedRecipes, totalRecipes);
+        this._maybeEmitRecipeProgress(processedRecipes, recipesData.length);
       }
 
       // --- Phase 4b: Prune provenance-matched orphans (overwrite of an existing system) ---
