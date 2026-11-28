@@ -22,6 +22,7 @@ const { evaluateSystemValidation, isRecipeIncomplete } =
 const { stripComponentsFromRecipes } = await import('../src/systems/manager/deleteCascades.js');
 const { evaluateRecipeReadiness } =
   await import('../src/ui/svelte/apps/manager/recipe/recipeReadiness.js');
+const { buildRecipeList } = await import('../src/ui/svelte/stores/adminRecipeRowProjection.js');
 const { describeComponentDeleteImpact } = await import('../src/utils/recipeComponentReferences.js');
 
 /** The lab's Chain Link: step 1 has no result set, step 2 has one, and a stale recipe-level group. */
@@ -106,6 +107,15 @@ describe('the editor check, its issue, the system report and the model agree per
       const incomplete = missing.length > 0;
       assert.equal(isRecipeIncomplete(new Recipe(json), json, mode), incomplete, 'model path');
       assert.equal(isIncompleteByCounts(json, mode), incomplete, 'count-only path');
+      const system = { ...chainLink().system, resolutionMode: mode };
+      const row = (recipe) =>
+        buildRecipeList(null, {}, system, '', { roster: [recipe] }).recipes[0].incomplete;
+      assert.equal(row(new Recipe(json)), incomplete, 'library row');
+      assert.equal(
+        row({ ...json, toJSON: () => structuredClone(json) }),
+        incomplete,
+        'library row, count-only'
+      );
     });
   }
 
