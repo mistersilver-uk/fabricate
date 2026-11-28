@@ -118,4 +118,5 @@ manager-recipe-edit-iterative-results-empty
 manager-recipe-edit-iterative-results-narrow
 manager-recipe-edit-iterative-validation
 manager-recipe-edit-iterative-validation-ready
+manager-recipe-edit-iterative-validation-chain
 manager-recipe-edit-iterative-mid-run

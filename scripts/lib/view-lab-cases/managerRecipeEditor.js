@@ -201,6 +201,7 @@ const ITERATIVE_VALIDATION_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeReadiness\.js$/,
 ]);
 const VALIDATION_STEPS_GROUP = '[data-recipe-tab="validation"] [data-validation-group="steps"]';
+const VALIDATION_RESULTS_GROUP = '[data-recipe-tab="validation"] [data-validation-group="results"]';
 const RESULTS_TAB = '[data-recipe-tab="results"]';
 const RESULT_SET_ROW = (id) => `${RESULTS_TAB} [data-iterative-result-set="${id}"]`;
 const OPEN_RESULTS = { selector: '#recipe-tab-results' };
@@ -2665,6 +2666,18 @@ export const CASES = Object.freeze([
     expectSelector:
       `${VALIDATION_STEPS_GROUP}:has([data-check="iterativeCounters"][data-satisfied="true"]) ` +
       '[data-check="iterativeStep:single"][data-satisfied="true"]',
+    sourceMatches: ITERATIVE_VALIDATION_SOURCES,
+  }),
+  // Chain Link's first step has no result set, which an iterative recipe allows before its last step.
+  iterativeRecipeCase({
+    id: 'manager-recipe-edit-iterative-validation-chain',
+    label: 'Manager — Recipe edit iterative validation, a step before the last with no result set',
+    recipeId: 'iw-r-chain',
+    recipes: 'chain',
+    steps: [{ selector: '#recipe-tab-validation' }, SCROLL_TO(VALIDATION_RESULTS_GROUP)],
+    expectSelector:
+      '[data-recipe-tab="validation"]:not(:has([data-issue="noResultGroup"])) ' +
+      '[data-validation-group="results"] [data-check="hasResultGroup"][data-satisfied="true"]',
     sourceMatches: ITERATIVE_VALIDATION_SOURCES,
   }),
   iterativeRecipeCase({

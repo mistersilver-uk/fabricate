@@ -65,7 +65,8 @@ Validation rules differ between single-step and explicit multi-step recipes:
 
 - `steps` array MUST have at least one entry.
 - Each step MUST have at least one `ingredientSet` with at least one `ingredientGroup`.
-- Each step MUST have at least one `resultGroup`.
+- Each step MUST have at least one `resultGroup`, except a step before the last of a recipe in an `iterative` system, which MAY have none and produces nothing when it ends.
+`Recipe.validate({ iterative: true })`, the Manager's `hasResultGroup` check and its `noResultGroup` issue, and the system validation report apply this rule through one predicate, `resultGroupRequired` (`src/models/iterativeStepConfig.js`), so the editor, the report and the start gate agree.
 Every non-`failure` result group on the **terminal** step MUST contain at least one result.
 A result group on any earlier step MAY be empty, so an intermediate step can cost time, materials and a check while producing nothing (issue 1907); the run advances through it and awards nothing.
 Progressive mode is the exception: every step's single ordered result group MUST be non-empty (`resolution-modes/spec.md`, `stepRequiresOrderedResults`), because a stage is defined by what it awards.
@@ -79,7 +80,7 @@ Progressive mode is the exception: every step's single ordered result group MUST
 Persistence gates on structural validity (`Recipe.validateStructure()`) only; structural-integrity errors still block persistence.
 - A shell is NOT craftable: `CraftingEngine.craft()` rejects it with the completeness error from `Recipe.validate()` — the load-bearing gate for every incomplete shape, including a shell that has ingredient sets but no result groups. `RecipeManager.evaluateCraftability` additionally returns `canCraft: false` for shells with no ingredient sets (its empty-ingredient-set guard), but that guard alone does not catch a shell whose only gap is missing result groups; `craft()`'s `Recipe.validate()` does.
 Completing the recipe (adding the missing ingredient sets/result groups) is what makes it craftable.
-- Incompleteness is *derived* from the recipe's structure, not stored: an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
+- Incompleteness is *derived* from the recipe's structure, not stored: an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or a result group it requires.
 A step whose result group is EMPTY is not an incomplete shell — it HAS a result group — so `validateStructure()` never reports it, and `validate()` reports `resultGroupEmpty` for it only on the terminal step (issue 1907).
 
 ## Step Structure

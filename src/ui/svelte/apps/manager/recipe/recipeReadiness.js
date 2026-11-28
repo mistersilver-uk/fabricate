@@ -22,6 +22,7 @@
  * @typedef {{ id: string, name: string, success?: boolean }} RoutedOutcomeTier
  */
 
+import { resultGroupRequired } from '../../../../../models/iterativeStepConfig.js';
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
 import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
 import { buildRecipeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
@@ -97,8 +98,12 @@ function resultGroupTarget(group) {
   return id ? `result-group-${id}` : '';
 }
 
+/** Whether `step` lacks a result group it requires (`resultGroupRequired`). */
+const missesResultGroup = (step, index, steps, iterativeMode) =>
+  step.resultGroups.length === 0 && resultGroupRequired(index, steps.length, iterativeMode);
+
 /** Missing-set and missing-group issues, one per offending step, blocking and critical. */
-function collectMissingRequirementIssues(executionSteps, isMultiStep) {
+function collectMissingRequirementIssues(executionSteps, isMultiStep, iterativeMode) {
   const issues = [];
   for (const step of executionSteps) {
     if (step.ingredientSets.length === 0) {
@@ -111,8 +116,8 @@ function collectMissingRequirementIssues(executionSteps, isMultiStep) {
       });
     }
   }
-  for (const step of executionSteps) {
-    if (step.resultGroups.length === 0) {
+  for (const [index, step] of executionSteps.entries()) {
+    if (missesResultGroup(step, index, executionSteps, iterativeMode)) {
       issues.push({
         id: 'noResultGroup',
         severity: 'critical',
@@ -561,6 +566,7 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
  * mode, under which a set may hold no choice group; and `alchemy` with
  * `signatureConflicts`, which drive the two enable blockers above and are ignored without it;
  * and `iterative`, the iterative route model's `recipeReadinessInput`, whose absence adds nothing.
+ * `iterativeMode`, or a present `iterative`, waives the result group of a step before the last.
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const systemComponents = Array.isArray(options.systemComponents) ? options.systemComponents : [];
@@ -576,10 +582,13 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const executionSteps = getExecutionSteps(recipe);
   const isMultiStep = executionSteps.length > 0 && executionSteps[0].explicit;
   const active = recipe?.enabled !== false;
+  const iterativeMode = options.iterativeMode === true || Boolean(options.iterative);
 
   const hasName = Boolean(trimmed(recipe?.name));
   const hasIngredientSet = executionSteps.every((step) => step.ingredientSets.length > 0);
-  const hasResultGroup = executionSteps.every((step) => step.resultGroups.length > 0);
+  const hasResultGroup = executionSteps.every(
+    (step, index, steps) => !missesResultGroup(step, index, steps, iterativeMode)
+  );
   const stepsNamed = executionSteps.every((step) => Boolean(step.name));
 
   const checks = [
@@ -603,7 +612,7 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
     });
   }
 
-  issues.push(...collectMissingRequirementIssues(executionSteps, isMultiStep));
+  issues.push(...collectMissingRequirementIssues(executionSteps, isMultiStep, iterativeMode));
 
   const duplicateIssues = collectDuplicateMatchIssues(executionSteps, isMultiStep);
   issues.push(...duplicateIssues);

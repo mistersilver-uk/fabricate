@@ -187,6 +187,8 @@ No mode, legacy alias or unknown token is refused, and each normalizes as before
 An overwrite import that would move an existing system into or out of `iterative` while it has an active crafting run is refused by `updateSystem`, writes no system or recipe, and rethrows that refusal.
 The character-library and world-scope roster merges that precede the system write are kept.
 
+A recipe whose only activation issue is `iterativeNotReady` is imported, created or overwritten, with `enabled: false`.
+
 ### Currency configuration merge on import
 
 Import MUST merge the payload's `currencyConfig` into the destination world's own configuration NON-DESTRUCTIVELY.
@@ -483,7 +485,7 @@ Under COPY mode, and scoped to a SEEDED destination because the seeding gate mak
 
 After ANY import, every membership record the import wrote MUST name the DESTINATION's system id.
 
-A keep-mode `export → import → export` of an `iterative` system MUST be equivalent modulo the volatile fields.
+A keep-mode `export → import → export` of an `iterative` system MUST be equivalent modulo the volatile fields and the `enabled` flag of a recipe imported disabled for `iterativeNotReady`.
 Each iterative key on both exports MUST equal its authored value, and re-normalizing the second export through `_normalizeSystem` and `Recipe.fromJSON().toJSON()` MUST change none of them.
 
 `Component.complications` MUST round-trip under keep mode in full, macro uuids included, and an ABSENT `complications` MUST stay absent — absence and an empty list are the same state by `data-models/spec.md` § Component requirement 20, so a round trip that materialized an empty array would be inventing a key the normalizer refuses to write.

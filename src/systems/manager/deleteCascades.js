@@ -495,10 +495,11 @@ export async function stripComponentsFromRecipes(io, systemId, removedIdSet) {
         recipe.craftingSystemId === systemId && recipeReferencesAnyComponent(recipe, removedIdSet)
     );
 
+  const mode = io.getSystem(systemId)?.resolutionMode;
   let recipesDisabled = 0;
   for (const recipe of recipes) {
     const { json } = stripComponentsFromRecipeJson(recipe, removedIdSet);
-    if (recipeLostItsShape(json)) {
+    if (recipeLostItsShape(json, mode)) {
       if (json.enabled !== false) recipesDisabled += 1;
       json.enabled = false;
     }
@@ -634,7 +635,7 @@ export async function deleteEssence(io, systemId, essenceId, { overrideInherited
       ingredientSets: io.stripEssenceFromSets(step.ingredientSets, essenceId),
     }));
 
-    if (recipeLostItsShape(updated)) updated.enabled = false;
+    if (recipeLostItsShape(updated, system.resolutionMode)) updated.enabled = false;
 
     await io.recipeManager().updateRecipe(recipe.id, updated, {
       notify: false,
@@ -729,6 +730,7 @@ async function stripEssencesFromRecipes(io, systemId, removedIds) {
         removedIds.some((essenceId) => recipeReferencesEssence(recipe, essenceId))
     );
 
+  const mode = io.getSystem(systemId)?.resolutionMode;
   let recipesDisabled = 0;
   for (const recipe of recipes) {
     const updated = recipe.toJSON();
@@ -739,7 +741,7 @@ async function stripEssencesFromRecipes(io, systemId, removedIds) {
         ingredientSets: io.stripEssenceFromSets(step.ingredientSets, essenceId),
       }));
     }
-    if (recipeLostItsShape(updated)) {
+    if (recipeLostItsShape(updated, mode)) {
       if (updated.enabled !== false) recipesDisabled += 1;
       updated.enabled = false;
     }

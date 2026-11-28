@@ -333,6 +333,27 @@ function authoringRecipes() {
   ];
 }
 
+/** Chain Link: step 1 produces nothing, step 2 the link; the stale recipe-level group is never read. */
+function chainLink() {
+  const step = (id, name, resultGroups, heat) => ({
+    id,
+    name,
+    ingredientSets: [simpleSet(`${id}-s1`, { 'iw-iron-bar': 1 })],
+    resultGroups,
+    iterative: { actions: onlyActions('stoke'), success: [heatAtLeast(heat)] },
+  });
+  const link = { id: 'g-link', results: [barOf(1)], producedWhen: [successLine] };
+  return recipe('iw-r-chain', 'Chain Link', LAB_SYSTEM_IDS.IRONWORKS, IRONWORKS_ICON, {
+    categories: ['Forging'],
+    resultGroups: [{ id: 'rg-stale', results: [barOf(9)], producedWhen: [successLine] }],
+    iterative: { counters: [{ counterId: 'heat', start: 0 }] },
+    steps: [
+      step('iw-chain-heat', 'Heat the rod', [], 4),
+      step('iw-chain-close', 'Close the link', [link], 6),
+    ],
+  });
+}
+
 const ironworksComponents = () => [
   component('iw-iron-bar', 'Iron Bar', IRONWORKS_ICON, { categories: ['Stock'] }),
   component('iw-steel-blade', 'Steel Blade', 'weapons/swords/sword-guard-worn.webp', {
@@ -404,6 +425,12 @@ export const LAB_ITERATIVE_RECIPE_STATES = Object.freeze({
   },
   midRun: (content, actors) => {
     if (authoring(content)) installMidRunWorkpieces(content, actors);
+  },
+  // Chain Link, whose first step has no result set, and Bent Nail off, so its switch refuses.
+  chain: (content) => {
+    if (!authoring(content)) return;
+    content.recipes.push(chainLink());
+    content.recipes.find((entry) => entry.id === 'iw-r-nail').enabled = false;
   },
   // No counters in the library, so a recipe has none to add.
   noLibrary: (content) => {

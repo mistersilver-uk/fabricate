@@ -100,6 +100,11 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
     'IssueIngredientGroupUnknownTag',
     'Ingredient group "{group}" references unknown tag "{tag}"',
   ],
+  // ACTIVATION-only iterative blocker, counting the recipe's own critical readiness issues.
+  iterativeNotReady: [
+    'IssueIterativeNotReady',
+    "Iterative setup has {count} blocking issue(s), listed on the recipe's Validation tab.",
+  ],
 });
 
 /**

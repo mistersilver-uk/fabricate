@@ -7,6 +7,7 @@ import { localizeWith } from '../utils/localizeWithFallback.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 
 import { iterativeCraftRefusal } from './iterative/iterativeCraftGate.js';
+import { modeValidationFlags } from './recipeValidation.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 
 /**
@@ -142,8 +143,9 @@ export function validateCraft(recipe, actor, modeService, refusals = {}) {
   const iterative = iterativeCraftRefusal(mode, { start: refusals.iterativeStart === true });
   if (iterative) return { valid: false, errors: [iterative] };
   const Roll = diceEngine();
-  const progressive = mode === 'progressive';
-  const validation = recipe.validate?.({ Roll, progressive }) ?? { valid: true, errors: [] };
+  const flags = modeValidationFlags(mode);
+  const { progressive } = flags;
+  const validation = recipe.validate?.({ Roll, ...flags }) ?? { valid: true, errors: [] };
   if (!validation.valid) return validation;
   const groups = [
     ...new Set([

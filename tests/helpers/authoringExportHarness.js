@@ -82,12 +82,14 @@ export function makeHarness(fixture, { simulateSettingChangeReload = true } = {}
   };
 
   const recipesById = new Map(fixture.recipes.map((r) => [r.id, structuredClone(r)]));
+  // Both getters return Recipe-shaped records carrying `toJSON`, as the real RecipeManager does.
+  const asRecipe = (r) => ({ ...structuredClone(r), toJSON: () => structuredClone(r) });
   const recipeManager = {
     getRecipes: ({ craftingSystemId } = {}) =>
       [...recipesById.values()]
         .filter((r) => !craftingSystemId || r.craftingSystemId === craftingSystemId)
-        .map((r) => ({ ...structuredClone(r), toJSON: () => structuredClone(r) })),
-    getRecipe: (id) => recipesById.get(id) || null,
+        .map(asRecipe),
+    getRecipe: (id) => (recipesById.has(id) ? asRecipe(recipesById.get(id)) : null),
     createRecipe: async (data) => {
       recipesById.set(data.id, structuredClone(data));
       return data;
