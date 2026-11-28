@@ -81,6 +81,7 @@ A claim check verifies against the server copy and cannot stop work already in f
 - **Embedded documents created or destroyed WITH their parent emit no `create<Embedded>` / `delete<Embedded>` hook.** Hook dispatch is per-operation-type, and embedded collections are materialised through `EmbeddedCollection#_initialize`, a path with no lifecycle hook dispatch at all.
 So an `Actor.create` carrying `items[]` — from an import, a duplicate, or a compendium drop — fires `createActor` and **zero** `createItem`, and `deleteActor` is symmetric.
 Any projection over `actor.items` must therefore hook the PARENT's CRUD (`createActor` / `deleteActor`) as well as the child's (`createItem` / `updateItem` / `deleteItem`); the parent hooks are load-bearing, not belt-and-braces.
+A write to an embedded Item fires `createItem` / `updateItem` / `deleteItem` on the Item and never `updateActor` on its parent, and a quantity merge into an existing stack is an `updateItem`.
 Filter the child hooks with `doc.parent?.documentName === 'Actor' && !doc.pack` — an Item embedded in a *compendium* Actor also has an Actor parent and could never change a world projection, and `Document#pack` falls back to `this.parent?.pack`, so the clause is directly testable.
 - Directory entry context menus are extended through the `get<Directory>ContextOptions` hook family (`getCompendiumContextOptions`, introduced 13.344; confirmed against V14.361 source) — an **array-mutation** hook: `(app, contextOptions) => contextOptions.push(entry)`, mutate in place and return nothing.
 Two traps.
@@ -194,7 +195,8 @@ Keep it at **single root-class** specificity (`.fabricate button:focus-visible`,
 Do not add scoped focus CSS in components — it duplicates the module block and needs a Svelte rebuild, whereas `styles/fabricate.css` is served directly.
 A new top-level app surface inherits that paired block automatically; write a per-area block only where a surface deliberately needs a different treatment, and say why.
 See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
-- Preserve `flags.core.sourceId` when embedded items must map back to a world item.
+- Core maintains an embedded item's provenance in `_stats.compendiumSource` (and `_stats.duplicateSource` for a duplicate).
+On V13 and V14 `DocumentStatsField._migrateData` moves `flags.core.sourceId` into `_stats.compendiumSource` and deletes the old key, with no compatibility shim (the shims cover `exportSource`), so a stored `sourceId` normally reads absent (checked against 13.336 and later).
 - Fabricate runs configured macros through `MacroExecutor.run(uuid, payload)` (`src/utils/MacroExecutor.js`), **not** `Macro#execute`.
 Foundry V13.351 `client/documents/macro.mjs` gates `Macro#execute(scope)` on the current user's Macro permission and requires LIMITED permission.
 Fabricate evaluates the configured command directly so player-initiated crafting can run GM-selected automation; this bypasses only that client-side Macro document gate and grants the current player no additional server or document authority.
@@ -238,6 +240,8 @@ So the fire-and-forget `setSetting(...)` idiom used for client-scoped settings (
 Every write broadcasts `createSetting`/`updateSetting` to every client (the FIRST write is `createSetting`, not `updateSetting`), so a per-gesture write must be debounced.
 It is per-user **within a world**, not per-account globally — the same player in a second world gets the default.
 Despite being async and replicated, the write is **locally coherent**: the awaited create/update populates the same local collection `ClientSettings#get` reads, so a `get` issued after the `await` returns the new value without waiting on any broadcast.
+The same holds for every awaited Document create, update or delete, not only a setting: it has applied to the requesting client's collection when it resolves, and other clients apply it from the broadcast through the same client database backend handlers.
+A player's Journal command is carried out by the active GM, so its writes are coherent on the GM client once the GM handler's awaited writes finish.
 That is what makes **flush-before-read an honest ordering guarantee** rather than a hopeful one — `await` the pending write, then start the operation that captures it (issue 675's salvage panel flushes its debounced order write before `salvage()` captures it onto the run record).
 It also means the failure mode to design for is **rejection, not staleness**.
 `progressiveResultOrder` is a user-scoped Setting document, so a sweep sees and writes only the current user's value, and a whole-object replace can lose a concurrent write from another device of the same user.
@@ -541,6 +545,8 @@ A restore fires `createItem` per document (`noHook` gates only the pre-hook) and
 `deleteEmbeddedDocuments('Item', ids)` fires one `deleteItem` hook per document on V13 and V14, and `foundry.documents.modifyBatch`, the multi-parent transaction, is V14-only while `module.json` declares `minimum: "13"`.
 A batch answers short rather than rejecting: `deleteEmbeddedDocuments` omits a document a `preDelete` hook refused, and `updateEmbeddedDocuments` omits one for a `_preUpdate` refusal, a `preUpdate<Type>` hook refusal, a throwing `updateSource` or the empty-diff drop.
 `collection.get(id, {strict: true})` throws for an id that vanished between plan and write, which rejects the whole batch.
+dnd5e 5.2.5 stores a physical item's `system.quantity` as `NumberField({ integer, min: 0 })`, and core's `NumberField` cleaning clamps to `min`, so a stored negative quantity cannot occur and an overspend stores 0.
+dnd5e merges stacks only for `consumable` items dropped on a sheet, never on `createEmbeddedDocuments`.
 - **A `Macro`'s `command` is a `StringField({ required: true, blank: true })` on EVERY macro type, so `typeof command === 'string'` does not mean "this is a script macro".**
 A `chat`-type macro passes that guard and has its chat text compiled as JavaScript by `MacroExecutor.run` (`src/utils/MacroExecutor.js`), so it throws for any body that is not also valid JS.
 Discriminating script from chat is therefore a **call-site** job, and deliberately not centralised: `MacroExecutor`'s own module docblock (`src/utils/MacroExecutor.js`) records that centralising it would turn a chat-type essence property macro from a silent `console.warn` into a per-essence-per-result error notification, and `tests/macro-executor.test.js` pins that decision as the ABSENCE of `/\.type\b/` and `/script/i` from the module's comment-stripped source.
