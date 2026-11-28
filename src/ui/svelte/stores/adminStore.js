@@ -6422,8 +6422,8 @@ export function createAdminStore(services) {
     const known = new Set(_getManagedItems(system).map((item) => String(item?.id ?? '')));
     const resolved = Array.from(componentIds || [], String).filter((id) => known.has(id));
     if (resolved.length === 0) return empty;
-
-    return describeComponentDeleteImpact(resolved, _selectedSystemRecipes(sysId));
+    const recipes = _selectedSystemRecipes(sysId);
+    return describeComponentDeleteImpact(resolved, recipes, system.resolutionMode);
   }
 
   /** The localized copy the singular component delete dialog reads (issue 1156). */

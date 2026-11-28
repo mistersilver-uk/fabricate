@@ -12,6 +12,7 @@
   import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
   import {
@@ -411,22 +412,20 @@
     <!-- Step mode sits directly above the surface it governs: the card below is either the steps
          list or the recipe's single Duration. Hidden while collapsed, because a collapsed recipe
          is NOT reverted — its steps are preserved and restored when the feature is. -->
-    <section class="manager-recipe-step-mode-card" data-recipe-section="recipe-step-mode">
-      <div>
-        <h3 class="manager-recipe-section-title">
-          {text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
-        </h3>
-        <p class="manager-muted">{stepModeHint}</p>
-      </div>
-      <SegmentedControl
-        options={STEP_MODE_OPTIONS}
-        value={isMultiStep ? 'multi' : 'single'}
-        groupName="manager-recipe-step-mode"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
-        optionDataAttr="data-recipe-step-mode-option"
-        onChange={selectStepMode}
-      />
-    </section>
+    <InspectorCard class="manager-recipe-step-mode-card" data-recipe-section="recipe-step-mode">
+      {#snippet title()}{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}{/snippet}
+      {#snippet note()}{stepModeHint}{/snippet}
+      {#snippet trailing()}
+        <SegmentedControl
+          options={STEP_MODE_OPTIONS}
+          value={isMultiStep ? 'multi' : 'single'}
+          groupName="manager-recipe-step-mode"
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
+          optionDataAttr="data-recipe-step-mode-option"
+          onChange={selectStepMode}
+        />
+      {/snippet}
+    </InspectorCard>
   {/if}
 
   {#if iterative}
@@ -436,24 +435,22 @@
   {#if collapsed}
     <!-- Collapsed chain: step authoring is read-only and the steps are listed verbatim for
          reference, while the chain's effective output is edited on the Results tab. -->
-    <section
+    <InspectorCard
       class="manager-recipe-duration-card manager-recipe-collapsed-steps-card"
       data-recipe-section="collapsed-steps"
     >
-      <div>
-        <h3 class="manager-recipe-section-title">
-          {text(
-            'FABRICATE.Admin.Manager.Recipe.CollapsedStepsTitle',
-            'Steps (multi-step disabled)'
-          )}
-        </h3>
-        <p class="manager-muted" data-recipe-collapsed-note>
+      {#snippet title()}{text(
+          'FABRICATE.Admin.Manager.Recipe.CollapsedStepsTitle',
+          'Steps (multi-step disabled)'
+        )}{/snippet}
+      {#snippet note()}
+        <span data-recipe-collapsed-note>
           {text(
             'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
             'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
           )}
-        </p>
-      </div>
+        </span>
+      {/snippet}
       <ol class="manager-recipe-collapsed-step-list">
         {#each recipe?.steps || [] as step, index (step.id ?? index)}
           <li class="manager-recipe-collapsed-step">
@@ -462,7 +459,7 @@
           </li>
         {/each}
       </ol>
-    </section>
+    </InspectorCard>
   {:else if isMultiStep}
     <RecipeStepsCard
       steps={recipe?.steps || []}
@@ -479,19 +476,13 @@
       {onDeleteStep}
     />
   {:else if timeRequirementsEnabled}
-    <section class="manager-recipe-duration-card" data-recipe-section="duration">
-      <div class="manager-recipe-duration-card-head">
-        <div>
-          <h3 class="manager-recipe-section-title">
-            {text('FABRICATE.Admin.Manager.Recipe.Duration', 'Duration')}
-          </h3>
-          <p class="manager-muted">
-            {text(
-              'FABRICATE.Admin.Manager.Recipe.DurationHint',
-              'How long this recipe takes to craft. Leave at zero for an instant craft.'
-            )}
-          </p>
-        </div>
+    <InspectorCard class="manager-recipe-duration-card" data-recipe-section="duration">
+      {#snippet title()}{text('FABRICATE.Admin.Manager.Recipe.Duration', 'Duration')}{/snippet}
+      {#snippet note()}{text(
+          'FABRICATE.Admin.Manager.Recipe.DurationHint',
+          'How long this recipe takes to craft. Leave at zero for an instant craft.'
+        )}{/snippet}
+      {#snippet trailing()}
         <Chip
           class="manager-recipe-duration-pill"
           icon="fa-solid fa-clock"
@@ -499,14 +490,14 @@
         >
           <span>{formatTimeRequirementCompact(recipe?.timeRequirement || null)}</span>
         </Chip>
-      </div>
+      {/snippet}
       <RecipeDurationSteppers
         timeRequirement={recipe?.timeRequirement || null}
         disabled={saving}
         showLabel={false}
         onChange={(next) => onUpdateRecipe({ timeRequirement: next })}
       />
-    </section>
+    </InspectorCard>
   {/if}
 
   <RecipeRoutingCard {recipe} {collapsed} {routing} disabled={saving} {onOpenChecks} />

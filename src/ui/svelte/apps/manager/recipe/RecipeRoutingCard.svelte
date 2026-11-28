@@ -21,6 +21,7 @@
 <script>
   import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import RoutingOverview from '../../../components/RoutingOverview.svelte';
   import { subjectName } from '../../../components/pickerRowKinds.js';
@@ -234,23 +235,20 @@
 {/snippet}
 
 {#if drawn}
-  <section class="manager-recipe-routing-card" data-recipe-section="routing">
-    <div class="manager-recipe-routing-head">
-      <h3 class="manager-recipe-section-title">
-        {localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingCard.Title', 'Routing')}
-      </h3>
-      <p class="manager-muted">
-        {provider === 'check'
-          ? localizeOr(
-              'FABRICATE.Admin.Manager.Recipe.RoutingCard.HintCheck',
-              'The outcome tiers belong to this system’s crafting check; this recipe chooses the result set each one produces.'
-            )
-          : localizeOr(
-              'FABRICATE.Admin.Manager.Recipe.RoutingCard.HintIngredients',
-              'Each ingredient set produces the result set its row names; re-point a row to change it.'
-            )}
-      </p>
-    </div>
+  <InspectorCard class="manager-recipe-routing-card" data-recipe-section="routing">
+    {#snippet title()}{localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.RoutingCard.Title',
+        'Routing'
+      )}{/snippet}
+    {#snippet note()}{provider === 'check'
+        ? localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.RoutingCard.HintCheck',
+            'The outcome tiers belong to this system’s crafting check; this recipe chooses the result set each one produces.'
+          )
+        : localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.RoutingCard.HintIngredients',
+            'Each ingredient set produces the result set its row names; re-point a row to change it.'
+          )}{/snippet}
     {#each scopes as scope, index (scope.stepId ?? 'recipe')}
       {@const view = scopeView(scope, index)}
       <div
@@ -344,5 +342,5 @@
         </RoutingOverview>
       </div>
     {/each}
-  </section>
+  </InspectorCard>
 {/if}

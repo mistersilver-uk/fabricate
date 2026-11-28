@@ -8,6 +8,7 @@
  */
 
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
+import { isIncompleteByCounts } from '../systems/recipeValidation.js';
 
 /** A result's component-bearing rows: itself, or a choice group's members (issue 1773). */
 const resultRows = (results) =>
@@ -58,17 +59,14 @@ export function recipeReferencesAnyComponent(recipe, componentIds) {
 }
 
 /**
- * Whether a rewritten recipe has lost an ingredient set or its results and must be clamped to
- * disabled. A recipe with explicit steps has lost its shape when any step has no ingredient set or
- * no result group, as `Recipe.validate` reports it; one without steps reads its own sets and results.
+ * Whether a rewritten recipe in a system resolving under `mode` has lost an ingredient set or a
+ * result group it requires and must be clamped to disabled. A recipe with explicit steps reads
+ * `isIncompleteByCounts`, so an `iterative` step before the last may have no group; one without
+ * steps reads its own sets and results, the legacy flat `results` alias included.
  */
-export function recipeLostItsShape(updated) {
+export function recipeLostItsShape(updated, mode) {
   const steps = Array.isArray(updated?.steps) ? updated.steps : [];
-  if (steps.length > 0) {
-    return steps.some(
-      (step) => !(step?.ingredientSets?.length > 0) || !(step?.resultGroups?.length > 0)
-    );
-  }
+  if (steps.length > 0) return isIncompleteByCounts(updated, mode);
   const hasResults =
     (updated?.resultGroups?.length || 0) > 0 || (updated?.results?.length || 0) > 0;
   const hasIngredientSets = (updated?.ingredientSets?.length || 0) > 0;
@@ -156,9 +154,9 @@ export function stripComponentsFromRecipeJson(recipe, componentIds) {
 
 /**
  * What a delete of the selected components would actually do — the impact statement the bulk panel
- * renders BEFORE the GM arms the control.
+ * renders BEFORE the GM arms the control, for a system resolving under `mode`.
  */
-export function describeComponentDeleteImpact(componentIds, recipes) {
+export function describeComponentDeleteImpact(componentIds, recipes, mode) {
   const ids = new Set(Array.from(componentIds || [], String).filter(Boolean));
   const rows = Array.isArray(recipes) ? recipes : [];
 
@@ -172,7 +170,7 @@ export function describeComponentDeleteImpact(componentIds, recipes) {
 
       const before = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
       const { json } = stripComponentsFromRecipeJson(recipe, ids);
-      if (before?.enabled !== false && recipeLostItsShape(json)) recipesDisabled += 1;
+      if (before?.enabled !== false && recipeLostItsShape(json, mode)) recipesDisabled += 1;
     }
   }
 

@@ -44,6 +44,7 @@ import {
 } from './recipeMatching.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import {
+  onlyIterativeNotReady,
   validateEnabledEssenceReferences,
   validateEssenceReferences,
   validateRecipeForActivation,
@@ -1518,22 +1519,22 @@ export class RecipeManager {
     return resolvedToolsFor(system);
   }
 
-  /** Import recipes from JSON. A recipe that cannot be imported is SKIPPED AND REPORTED, never
-   * thrown, and the skips are surfaced in ONE aggregated conflict-report notification. */
+  /** Import recipes from JSON. A recipe refused activation only for `iterativeNotReady` is stored
+   * disabled; any other refusal is skipped and reported in one aggregated conflict report. */
   async importRecipes(recipesData, overwrite = false) {
     this._assertGM('import recipes');
 
     let imported = 0;
     let skipped = 0;
-    // Per-recipe conflict reasons, aggregated into ONE report at completion rather than a mid-loop
-    // warn or a silent skip, and distinct from the terminal counts notification.
+    // Per-recipe conflict reasons, kept apart from the terminal counts notification.
     const conflicts = [];
 
     for (const recipeData of recipesData) {
       const recipe = Recipe.fromJSON(recipeData);
       const validation = this._validateRecipeForActivation(recipe);
 
-      if (!validation.valid) {
+      if (onlyIterativeNotReady(validation)) recipe.enabled = false;
+      else if (!validation.valid) {
         conflicts.push({
           recipeId: recipe.id,
           recipeName: recipe.name,
@@ -1564,7 +1565,6 @@ export class RecipeManager {
     // No `removedRecipeIds`: an import only ADDS or REPLACES, so nothing was orphaned and the
     // gate has nothing to fall back to (issue 1226). The sweep is a pure orphan hunt.
     await this._cleanupFlagsAfterRecipeMutation();
-    // One aggregated conflict report naming each skipped recipe and its reason.
     if (conflicts.length > 0) {
       ui.notifications.warn(this._formatImportConflictReport(conflicts));
     }

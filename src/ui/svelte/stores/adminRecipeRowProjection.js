@@ -46,6 +46,7 @@
  * Deliberately a LEAF under `stores/`: no `.svelte` imports from `src/ui/svelte/stores/`,
  * so this module cannot reach a mounted-component test's dependency closure.
  */
+import { isIncompleteByCounts, modeValidationFlags } from '../../../systems/recipeValidation.js';
 import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js';
 import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
 import { recipeItemDefinitionsContaining } from '../../../utils/recipeItemMembership.js';
@@ -154,30 +155,6 @@ function _recipeStructure(isSimple, stepCount) {
 }
 
 /**
- * Coarse fallback for {@link _isRecipeIncomplete} when a recipe model instance
- * (with `validate()` / `validateStructure()`) is unavailable. Detects the common
- * shell shapes — missing ingredient sets / result groups — but not the deeper
- * completeness cases the validators reject.
- * @param {object} recipe
- * @returns {boolean}
- */
-function _isRecipeIncompleteByCounts(recipe) {
-  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
-  if (steps.length > 0) {
-    return steps.some(
-      (step) =>
-        !Array.isArray(step?.ingredientSets) ||
-        step.ingredientSets.length === 0 ||
-        !Array.isArray(step?.resultGroups) ||
-        step.resultGroups.length === 0
-    );
-  }
-  const ingredientSets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
-  const resultGroups = Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
-  return ingredientSets.length === 0 || resultGroups.length === 0;
-}
-
-/**
  * Whether a recipe is an incomplete authoring shell — persistable but not craftable. It is
  * incomplete iff it is structurally sound but fails the full completeness contract the engine
  * gates craft on, so the chip never reads "complete" for a recipe whose ingredient set has no
@@ -186,12 +163,12 @@ function _isRecipeIncompleteByCounts(recipe) {
  */
 function _isRecipeIncomplete(recipe, system) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    const injected = { Roll: diceEngine(), progressive: system?.resolutionMode === 'progressive' };
+    const injected = { Roll: diceEngine(), ...modeValidationFlags(system?.resolutionMode) };
     return (
       recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
     );
   }
-  return _isRecipeIncompleteByCounts(recipe);
+  return isIncompleteByCounts(recipe, system?.resolutionMode);
 }
 
 /**

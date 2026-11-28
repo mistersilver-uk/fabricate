@@ -3286,8 +3286,10 @@ test('the capture runner threads the per-case console allowance into the render'
     // a warning (issues 2005, 2092, 2006, 2007 and 2132). The GM complication card's skipped macro
     // is reported as a warning beside the card that names it (issue 2153). A refused Tool save
     // raises the store's own failure toast (issue 1522). A thrown Iterative Attempt command is
-    // logged by the attempt store before it reads as unanswered (issue 3011).
+    // logged by the attempt store before it reads as unanswered (issue 3011). A refused iterative
+    // enable is logged as the plain refused enable is.
     [
+      'manager-recipes-iterative-enable-refused',
       'manager-recipes-blocked-enable-flash',
       'manager-tool-editor-save-failed',
       'manager-knowledge-error',
@@ -3324,6 +3326,7 @@ test('the two alert frames assert their alert is inside the box that clips it', 
     // not ride the row list's scroll - but that is an argument about a stylesheet, and this makes
     // it a measurement taken at capture time instead.
     ['manager-recipes-blocked-enable-flash', '.manager-main', '[data-recipe-flash]'],
+    ['manager-recipes-iterative-enable-refused', '.manager-main', '[data-recipe-flash]'],
   ];
 
   for (const [caseId, container, target] of pinned) {

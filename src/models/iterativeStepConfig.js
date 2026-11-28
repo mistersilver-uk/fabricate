@@ -82,6 +82,11 @@ export function normalizeRecipeIterative(raw, { hasSteps = false } = {}) {
   };
 }
 
+/** Whether the step at `stepIndex` of `stepCount` needs a result set: every step but a non-final iterative one. */
+export function resultGroupRequired(stepIndex, stepCount, iterative = false) {
+  return !iterative || stepIndex >= stepCount - 1;
+}
+
 /** `null` for a well-formed routing line, else `'line'`, `'end'` or `'rules'`. */
 export function producedWhenLineFault(line) {
   if (!isPlainObject(line)) return 'line';

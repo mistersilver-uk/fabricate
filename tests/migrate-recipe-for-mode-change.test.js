@@ -912,6 +912,29 @@ test("incompleteAfter equals the row projection's incomplete over the same migra
   }
 });
 
+test('incompleteAfter judges Chain Link under the target mode, never the source', async () => {
+  const { isRecipeIncomplete } = await import('../src/systems/systemValidation.js');
+  const json = chainLink();
+  const model = Recipe.fromJSON(structuredClone(json));
+  assert.equal(isRecipeIncomplete(model, json, 'iterative'), false, 'iterative waives step 1');
+  assert.equal(isRecipeIncomplete(model, json, 'routedByCheck'), true);
+  assert.equal(summarizeModeChange([json], 'iterative', 'routedByCheck', iterativeSystem()).incompleteAfter, 1);
+});
+
+test('the count-only fallback agrees with the model path, in iterative and out of it', async () => {
+  const { isRecipeIncomplete } = await import('../src/systems/systemValidation.js');
+  for (const mode of ['iterative', 'routedByCheck', 'simple']) {
+    for (const recipe of [chainLink(), completeRecipe(), emptyShell(), twoStepShield()]) {
+      const model = Recipe.fromJSON(structuredClone(recipe));
+      assert.equal(
+        isRecipeIncomplete(null, recipe, mode),
+        isRecipeIncomplete(model, recipe, mode),
+        `${recipe.id} under ${mode}`
+      );
+    }
+  }
+});
+
 test('summarizeModeChange from iterative to iterative counts nothing', () => {
   const summary = summarizeModeChange([MATRIX_FIXTURES.tierLinks(), emptyShell()], 'iterative', 'iterative', iterativeSystem());
   assert.equal(summary.inertTierLinks, 0);

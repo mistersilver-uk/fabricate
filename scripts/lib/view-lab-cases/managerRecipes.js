@@ -21,6 +21,9 @@ const RECIPE_ITEM_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/recipe-item\/recipeItemModel\.svelte\.js$/;
 /** A library row of the lab's authored Ironworks. */
 const ITERATIVE_ROW = (recipeId) => `.manager-recipe-row[data-recipe-id="${recipeId}"]`;
+/** That row's enable switch. */
+const ITERATIVE_TOGGLE = (recipeId) =>
+  `${ITERATIVE_ROW(recipeId)} .manager-recipe-status .fabricate-toggle`;
 
 export const CASES = Object.freeze([
   managerCase({
@@ -68,11 +71,14 @@ export const CASES = Object.freeze([
     // Tempered Blade sorts last, below the fold.
     steps: ['Crafting', { selector: ITERATIVE_ROW('iw-r-blade'), scroll: true }],
     expectView: 'recipes',
-    // One pill per row: Ingot needs setup, Nail blocks, Blade is ready, and Hinge, which activation
-    // refuses, wears Incomplete and no Ready.
+    // Ingot needs setup and Nail blocks, each beside the Incomplete pill its enable blocker draws, as
+    // Rivet and Sword wear too; Blade is ready, and Hinge, which activation refuses, wears
+    // Incomplete and no Ready.
     expectSelector:
       `.fabricate-manager:has(${ITERATIVE_ROW('iw-r-ingot')} [data-recipe-status="iterativeSetup"])` +
+      `:has(${ITERATIVE_ROW('iw-r-ingot')} [data-recipe-status="incomplete"])` +
       `:has(${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="iterativeBlocking"])` +
+      `:has(${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="incomplete"])` +
       `:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="incomplete"])` +
       `:not(:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="iterativeReady"])) ` +
       `${ITERATIVE_ROW('iw-r-blade')} [data-recipe-status="iterativeReady"]`,
@@ -88,6 +94,61 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/iterative\/iterative(?:RecipeIssues|HeaderCopy)\.js$/,
       /^src\/ui\/svelte\/stores\/recipeIterativeStatus\.js$/,
       /^src\/ui\/model\/recipeBrowserModel\.js$/,
+      /^src\/systems\/recipeValidation\.js$/,
+      /^src\/systems\/iterative\/iterativeCraftGate\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipes-iterative-enable-refused',
+    label: 'Manager — Recipes iterative enable refused, setup not ready',
+    // `beyond`: the smoke walk never builds an iterative system.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Bent Nail is off with two blocking iterative issues, so its switch refuses.
+    query: { system: 'lab-ironworks', iterative: 'populated', iterativeRecipes: 'chain' },
+    steps: ['Crafting', { selector: ITERATIVE_TOGGLE('iw-r-nail') }],
+    expectView: 'recipes',
+    expectSelector:
+      `.fabricate-manager:has(${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="blocked"]) ` +
+      '.fab-notice[data-recipe-flash][role="alert"]:has(.fab-notice-title):has(.fab-notice-detail) ' +
+      '[data-notice-dismiss]',
+    allowedConsoleErrors: [/Fabricate \| Failed to toggle recipe enabled state/],
+    expectContained: [{ container: '.manager-main', target: '[data-recipe-flash]' }],
+    expectCenterHit: ITERATIVE_TOGGLE('iw-r-nail'),
+    kinds: ['manager', 'recipes', 'iterative'],
+    sourceMatches: [
+      /^src\/systems\/iterative\/iterativeCraftGate\.js$/,
+      /^src\/systems\/recipeValidation\.js$/,
+      /^src\/utils\/recipeActivationMessages\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipes-iterative-chain-step-empty',
+    label: 'Manager — Recipes inspector on an iterative step with no result set',
+    // `beyond`: the smoke walk never builds an iterative system.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-ironworks', iterative: 'populated', iterativeRecipes: 'chain' },
+    steps: [
+      'Crafting',
+      { selector: `${ITERATIVE_ROW('iw-r-chain')} .manager-recipe-identity` },
+      { selector: '[data-recipe-step-pager]', scroll: true },
+    ],
+    expectView: 'recipes',
+    // Chain Link's step 1 has no result set, which iterative waives (`resultGroupRequired`), so
+    // the note is the neutral muted one and the danger panel is absent.
+    expectSelector:
+      '[data-recipe-inspector]:has([data-recipe-step-name]:has-text("Heat the rod"))' +
+      ':not(:has(.manager-recipe-flow-empty)) ' +
+      '[data-recipe-produces-empty].manager-muted',
+    expectContained: [
+      { container: '[data-recipe-inspector]', target: '[data-recipe-step-pager]' },
+      { container: '[data-recipe-inspector]', target: '[data-recipe-produces-empty]' },
+    ],
+    kinds: ['manager', 'recipes', 'iterative'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
+      /^src\/models\/iterativeStepConfig\.js$/,
     ],
   }),
   managerCase({

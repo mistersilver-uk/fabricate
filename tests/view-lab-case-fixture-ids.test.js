@@ -21,11 +21,11 @@ const parties = seedSettings(content, buildLabActors(content), null, true, false
 );
 const ids = (records) => new Set((records ?? []).map((record) => record.id));
 
-/** The recipes a frame reaches once `query.iterativeRecipes` authors the Ironworks ones. */
-function withIronworksRecipes() {
+/** The recipes a frame reaches once `query.iterativeRecipes` authors the Ironworks ones in `state`. */
+function withIronworksRecipes(state = 'authoring') {
   const seeded = buildLabContent();
   seedIterativeState(seeded, 'populated');
-  seedIterativeRecipes(seeded, [], 'authoring');
+  seedIterativeRecipes(seeded, [], state);
   return seeded.recipes;
 }
 
@@ -35,7 +35,11 @@ function withWorkpieceRecipes() {
   seedIterativeState(seeded, 'workpiece');
   return seeded.recipes;
 }
-const SEEDED_RECIPE_IDS = ids([...withIronworksRecipes(), ...withWorkpieceRecipes()]);
+const SEEDED_RECIPE_IDS = ids([
+  ...withIronworksRecipes(),
+  ...withIronworksRecipes('chain'),
+  ...withWorkpieceRecipes(),
+]);
 
 /** The fixture collection each id-bearing attribute addresses. */
 const COLLECTION_BY_ATTRIBUTE = Object.freeze({

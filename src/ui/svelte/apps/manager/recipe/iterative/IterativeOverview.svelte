@@ -17,6 +17,7 @@
 -->
 <script>
   import { localizeOr as text } from '../../../../util/localizeOr.js';
+  import InspectorCard from '../../../../components/InspectorCard.svelte';
   import IterativeCountersCard from './IterativeCountersCard.svelte';
   import IterativeStepConfig from './IterativeStepConfig.svelte';
 
@@ -36,20 +37,15 @@
 <IterativeCountersCard {recipe} {iterative} {isMultiStep} {disabled} {text} {onUpdateRecipe} />
 
 {#if !isMultiStep}
-  <section class="manager-recipe-steps-card" data-recipe-section="iterative-step">
-    <div class="manager-recipe-steps-card-head">
-      <div>
-        <h3 class="manager-recipe-section-title">
-          {text('FABRICATE.Admin.Manager.Recipe.Iterative.WorkingHeading', 'Working the recipe')}
-        </h3>
-        <p class="manager-muted">
-          {text(
-            'FABRICATE.Admin.Manager.Recipe.Iterative.WorkingHint',
-            'What players can do, and when it ends.'
-          )}
-        </p>
-      </div>
-    </div>
+  <InspectorCard class="manager-recipe-steps-card" data-recipe-section="iterative-step">
+    {#snippet title()}{text(
+        'FABRICATE.Admin.Manager.Recipe.Iterative.WorkingHeading',
+        'Working the recipe'
+      )}{/snippet}
+    {#snippet note()}{text(
+        'FABRICATE.Admin.Manager.Recipe.Iterative.WorkingHint',
+        'What players can do, and when it ends.'
+      )}{/snippet}
     <IterativeStepConfig
       config={recipe?.iterative?.step ?? null}
       instances={recipe?.iterative?.counters ?? []}
@@ -58,5 +54,5 @@
       {text}
       onChange={writeStep}
     />
-  </section>
+  </InspectorCard>
 {/if}

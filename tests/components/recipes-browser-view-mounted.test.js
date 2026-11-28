@@ -47,6 +47,16 @@ import { seedIterativeRecipes, seedIterativeState } from '../view-lab/world/labI
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
+// The activation gate the store's row reads, run over the lab content.
+const { Recipe } = await import('../../src/models/Recipe.js');
+const { RecipeActivationError } = await import('../../src/systems/RecipeActivationError.js');
+const { RecipeManager } = await import('../../src/systems/RecipeManager.js');
+const { localizeRecipeActivationError, localizeRecipeActivationParts } =
+  await import('../../src/utils/recipeActivationMessages.js');
+const { installFoundryUtilsEnv } = await import('../helpers/foundryEnv.js');
+// A lab result carries no id, so the model mints one through Foundry's `randomID`.
+installFoundryUtilsEnv();
+
 const RECIPE_RAW_MODULES = [
   // Issue 1506: the one tone map the converted status pills read at a dynamic site.
   ...STATUS_TONE_RAW_MODULES,
@@ -763,19 +773,27 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
   };
 
   /** The lab's authored Ironworks as library rows, each status read through the store's own field. */
-  function ironworksRows() {
+  function ironworksRows(state = 'authoring') {
     const content = buildLabContent();
     seedIterativeState(content, 'populated');
-    seedIterativeRecipes(content, [], 'authoring');
+    seedIterativeRecipes(content, [], state);
     const persisted = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.IRONWORKS);
     const system = { ...persisted, iterative: normalizeIterativeLibrary(persisted.iterative) };
     // The persisted entries: the oracle suite pins the same statuses over the Recipe models.
     const recipes = content.recipes.filter((entry) => entry.craftingSystemId === system.id);
     const context = createIterativeStatusContext(system, recipes);
+    // Activation's own verdict over the lab content, the predicate the store's row reads.
+    const activation = new RecipeManager({
+      getCraftingSystemManager: () => ({ getSystem: () => system, getSystems: () => [system] })
+    });
     const rows = recipes.map((recipe) => {
-      // Hinge is the one recipe with no ingredient set anywhere, so activation refuses it.
-      const enableBlocked = !recipe.ingredientSets?.length && !recipe.steps?.length;
-      const row = makeRecipe({ id: recipe.id, name: recipe.name, enableBlocked });
+      const enableBlocked = !activation.canActivateRecipe(new Recipe(recipe)).valid;
+      const row = makeRecipe({
+        id: recipe.id,
+        name: recipe.name,
+        enabled: recipe.enabled,
+        enableBlocked
+      });
       defineIterativeStatus(row, recipe, context);
       return row;
     });
@@ -787,7 +805,7 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
         )
       ])
     );
-    return { rows, statuses };
+    return { rows, statuses, recipes, activation };
   }
 
   it('draws each row’s pill from its status, with Ready withheld while enabling is blocked', async () => {
@@ -802,15 +820,69 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
       ];
       assert.deepEqual(pillsOf(root, row.id), expected, `${row.id} draws its status`);
     }
-    // The oracle's rows, literally, so the agreement above is not vacuous.
-    assert.deepEqual(pillsOf(root, 'iw-r-nail').map((pill) => pill[3]), ['2 blocking']);
-    assert.deepEqual(pillsOf(root, 'iw-r-rivet').map((pill) => pill[3]), ['3 blocking']);
-    assert.deepEqual(pillsOf(root, 'iw-r-ingot').map((pill) => pill[0]), ['iterativeSetup']);
+    // The oracle's rows, literally, so the agreement above is not vacuous: each recipe with an
+    // enable blocker wears the activation pill beside its iterative one.
+    assert.deepEqual(pillsOf(root, 'iw-r-nail').map((pill) => pill[3]), ['Incomplete', '2 blocking']);
+    assert.deepEqual(pillsOf(root, 'iw-r-rivet').map((pill) => pill[3]), ['Incomplete', '3 blocking']);
+    assert.deepEqual(
+      pillsOf(root, 'iw-r-ingot').map((pill) => pill[0]),
+      ['incomplete', 'iterativeSetup']
+    );
+    assert.deepEqual(
+      pillsOf(root, 'iw-r-sword').map((pill) => pill[0]),
+      ['incomplete', 'iterativeSetup']
+    );
     assert.deepEqual(pillsOf(root, 'iw-r-blade').map((pill) => pill[0]), ['iterativeReady']);
     assert.deepEqual(
       pillsOf(root, 'iw-r-hinge').map((pill) => pill[0]),
       ['incomplete'],
       'Hinge is ready by its issues, but activation refuses it, so it wears no Ready'
+    );
+    // The frame's selector, clause by clause: happy-dom misreads a `:has()` over a compound with
+    // attribute values, and cannot match `:not(:has())`, whose one clause is Hinge's assertion above.
+    const { expectSelector } = getCaseById('manager-recipes-iterative');
+    const clauses = [...expectSelector.matchAll(/(?<!:not\():has\(([^()]*)\)/g)].map(([, arg]) => arg);
+    clauses.push(expectSelector.slice(expectSelector.lastIndexOf(') ') + 2));
+    assert.equal(clauses.length, 6, 'five pill clauses and Blade’s Ready');
+    for (const clause of clauses) {
+      assert.ok(Boolean(document.querySelector(clause)), `the iterative status frame lacks ${clause}`);
+    }
+  });
+
+  it('flashes a refused iterative enable with its blocking count, as the capture case draws it', async () => {
+    const { rows, recipes, activation } = ironworksRows('chain');
+    const calls = [];
+    const root = await browser.mount({
+      recipes: rows,
+      showRecipeCategories: false,
+      onToggleEnabled: (id, enabled, options) => {
+        calls.push({ id, enabled, options });
+      }
+    });
+    const viewCase = getCaseById('manager-recipes-iterative-enable-refused');
+    root.querySelector(viewCase.steps.at(-1).selector).click();
+    flushSync();
+    assert.deepEqual([calls[0].id, calls[0].enabled], ['iw-r-nail', true]);
+
+    // The store's refusal path, over the issues activation raises for Nail.
+    const nail = recipes.find((recipe) => recipe.id === 'iw-r-nail');
+    const { issues } = activation.canActivateRecipe(new Recipe(nail));
+    const error = new RecipeActivationError(nail.name, issues);
+    const localize = (key) => key;
+    calls[0].options.onBlocked(
+      localizeRecipeActivationError(error, localize),
+      localizeRecipeActivationParts(error, localize)
+    );
+    flushSync();
+
+    const flash = root.querySelector('[data-recipe-flash]');
+    assert.equal(
+      flash.querySelector('.fab-notice-detail').textContent.trim(),
+      "Iterative setup has 2 blocking issue(s), listed on the recipe's Validation tab."
+    );
+    assert.ok(
+      Boolean(document.querySelector(viewCase.expectSelector.replace('.fabricate-manager', 'body'))),
+      `the refused-enable frame's selector matched nothing: ${viewCase.expectSelector}`
     );
   });
 
@@ -2020,6 +2092,33 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
     assert.ok(Boolean(empty.querySelector('i')), 'and its alarm icon');
     assert.match(empty.textContent, /a successful craft makes nothing/);
+  });
+
+  it('iterative: Chain Link step 1 has no result set and reads neutral, unlike in another mode', async () => {
+    const content = buildLabContent();
+    seedIterativeState(content, 'populated');
+    seedIterativeRecipes(content, [], 'chain');
+    const chain = content.recipes.find((entry) => entry.id === 'iw-r-chain');
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: chain.id, name: chain.name, steps: chain.steps }),
+      resolutionMode: 'iterative',
+      recipeCount: 1
+    });
+
+    const waived = root.querySelector('[data-recipe-produces-empty]');
+    assert.match(waived.textContent, /only advances the craft/);
+    assert.ok(waived.classList.contains('manager-muted'), 'a waived step carries the neutral note');
+    // What `manager-recipes-iterative-chain-step-empty` reads, bar Playwright's `:has-text`.
+    assert.equal(root.querySelector('[data-recipe-step-name]').textContent.trim(), 'Heat the rod');
+    assert.ok(!root.querySelector('.manager-recipe-flow-empty'), 'and no danger panel');
+
+    await inspector.setProps({ resolutionMode: 'routedByCheck' });
+    const required = root.querySelector('[data-recipe-produces-empty]');
+    assert.match(required.textContent, /a successful craft makes nothing/);
+    assert.ok(
+      required.classList.contains('manager-recipe-flow-empty'),
+      'outside iterative the step still needs a set, so it keeps the danger note'
+    );
   });
 
   it('alchemy: two outcome sections — Success and Failure — never "Result Group N"', async () => {

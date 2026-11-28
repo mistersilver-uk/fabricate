@@ -1,8 +1,36 @@
 /** A recipe's persistence and activation validity, as pure checks over an explicit seam bag.
  * Every check takes the recipe first and resolves its system through `deps`, never a manager. */
 
+import { resultGroupRequired } from '../models/iterativeStepConfig.js';
 import { getMatchHandler } from '../models/match/matchTypes.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
+
+import { iterativeActivationIssues } from './iterative/iterativeCraftGate.js';
+
+/** The mode flags `Recipe.validate` reads for a system resolving under `mode`. */
+export function modeValidationFlags(mode) {
+  return { progressive: mode === 'progressive', iterative: mode === 'iterative' };
+}
+
+/** Whether an activation result refuses for `iterativeNotReady` alone, so an import stores it disabled. */
+export function onlyIterativeNotReady(activation) {
+  const [issue, ...rest] = activation?.issues ?? [];
+  return issue?.code === 'iterativeNotReady' && rest.length === 0 && activation.errors.length === 1;
+}
+
+/** The count-only reading of an incomplete shell under `mode`, for plain JSON with no model: a
+ * scope missing its ingredient set or a result group it requires (`resultGroupRequired`). */
+export function isIncompleteByCounts(raw, mode) {
+  const isEmpty = (list) => !Array.isArray(list) || list.length === 0;
+  const steps = Array.isArray(raw?.steps) ? raw.steps : [];
+  if (steps.length === 0) return isEmpty(raw?.ingredientSets) || isEmpty(raw?.resultGroups);
+  const { iterative } = modeValidationFlags(mode);
+  return steps.some(
+    (step, index) =>
+      isEmpty(step?.ingredientSets) ||
+      (isEmpty(step?.resultGroups) && resultGroupRequired(index, steps.length, iterative))
+  );
+}
 
 function noIssues() {
   return { valid: true, errors: [], issues: [] };
@@ -223,7 +251,7 @@ export function validateTagPlaceholders(recipe, { system }) {
  * progressive system, whose award drops it. */
 export function validateRecipeForPersistence(recipe, deps, { requireComplete = true } = {}) {
   const system = deps.system?.(recipe.craftingSystemId);
-  const injected = { Roll: deps.roll, progressive: system?.resolutionMode === 'progressive' };
+  const injected = { Roll: deps.roll, ...modeValidationFlags(system?.resolutionMode) };
   const baseValidation = requireComplete
     ? recipe.validate(injected)
     : recipe.validateStructure(injected);
@@ -245,8 +273,9 @@ export function validateRecipeForPersistence(recipe, deps, { requireComplete = t
   return fromIssues(issues);
 }
 
-/** Full validity required to activate a recipe: completeness, every persistence check and
- * signature uniqueness. `issues` mirrors `errors` with a stable `code` (issue 550). */
+/** Full validity required to activate a recipe: completeness, every persistence check, signature
+ * uniqueness, enabled essences and iterative readiness. `issues` mirrors `errors` with a stable
+ * `code` (issue 550). */
 export function validateRecipeForActivation(recipe, deps) {
   const persistence = validateRecipeForPersistence(recipe, deps, { requireComplete: true });
   const errors = [...persistence.errors];
@@ -259,6 +288,9 @@ export function validateRecipeForActivation(recipe, deps) {
   const disabledEssenceValidation = validateEnabledEssenceReferences(recipe, deps);
   errors.push(...disabledEssenceValidation.errors);
   issues.push(...disabledEssenceValidation.issues);
+  const iterativeIssues = iterativeActivationIssues(deps.system?.(recipe.craftingSystemId), recipe);
+  errors.push(...iterativeIssues.map((issue) => issue.message));
+  issues.push(...iterativeIssues);
 
   return {
     valid: errors.length === 0,

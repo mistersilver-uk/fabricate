@@ -68,7 +68,7 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
 | `routedByCheck`       | one or more     | one or more                 | required           | system routed-check outcome         |
 | `progressive`         | exactly 1       | exactly 1 (ordered results) | required           | numeric value spending              |
 | `alchemy`             | exactly 1       | per `checkMode` (see below) | none / required-when-simple / required-when-tiered | system `alchemy.checkMode`          |
-| `iterative`           | exactly 1 per step | zero or more, each selected by `producedWhen` | required when an allowed action has `check: 'roll'` | `ResultGroup.producedWhen` at the step's end |
+| `iterative`           | exactly 1 per step | zero or more on a step before the last, one or more on the last, each selected by `producedWhen` | required when an allowed action has `check: 'roll'` | `ResultGroup.producedWhen` at the step's end |
 
 ## Result-Side Choice Groups
 
@@ -1116,7 +1116,7 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - The admin store refuses, writing nothing, a token that is neither a mode nor a legacy alias (`modeChangeRefusal`); a legacy alias keeps today's path, and re-selecting the saved mode is a no-op that succeeds.
 - `updateSystem` refuses a change into or out of `iterative` while the system has an active crafting run.
 - The versioned run start and the step start run for a recipe in an `iterative` system.
-- The legacy `craft`, the versioned execute, the stage check description and the immediate-execute probe still refuse it before any run, consumption, spend, roll or award, each with `Iterative crafting is not available in this version of Fabricate.`
+- The legacy `craft`, the versioned execute, the stage check description and the immediate-execute probe still refuse it before any run, consumption, spend, roll or award, each with `Iterative recipes are worked one action at a time from the Journal.`
   A versioned start therefore never answers `canExecuteImmediately: true` for an iterative recipe, and each Iterative Attempt is its own `takeAction` command.
 - `craftAlchemy` and the versioned alchemy start already refuse a system that is not in `alchemy` mode, and salvage keeps its own `salvageResolutionMode`.
 
@@ -1260,6 +1260,8 @@ The gate evaluates a candidate as though its activation had already landed, whet
 - A new iterative run is refused, with nothing spent, while its recipe has a critical iterative readiness issue, while a critical library issue names a counter or action in the subset its terms snapshot would carry, or while its system's iterative library version is unsupported.
   `iterativeStartBlockers(issues, recipe, system)` answers exactly those issues, where a step allows every action unless its `actions.mode` is `'only'`.
   The refusal is `{ success: false, reason: 'iterative-not-ready', detail: { code, message } }` from the first blocker, with no top-level `message`, so the localized reason sentence shows.
+- Recipe activation (enabling, bulk enabling and a strict create through `validateRecipeForActivation`) refuses an `iterative` recipe while it has a recipe-scoped issue with `blocks: 'enable'`, adding one `iterativeNotReady` activation issue whose `count` is their number; a library issue never blocks activation.
+- An import never refuses a recipe for `iterativeNotReady` alone: `RecipeManager.importRecipes` and `CompendiumImporter.importFromPackData`, creating or overwriting, store it with `enabled: false`.
 
 ## Testing Requirements
 
