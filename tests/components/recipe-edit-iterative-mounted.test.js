@@ -27,6 +27,7 @@ import { recipeHeaderChip } from '../../src/ui/svelte/apps/manager/recipes/recip
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices } from '../helpers/adminStoreServices.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
+import { assertOneCard } from '../helpers/inspectorCardShell.js';
 import { setInputValue } from '../helpers/manager/managerQueries.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
@@ -705,6 +706,25 @@ describe('iterative recipe Overview: a single step’s Working the recipe card',
     const world = ironworks();
     await mountEditor(world, await draftOf(world, 'iw-r-blade'));
     assert.ok(!$(`${STEP_CARD} [data-iterative-step-part="counters"]`), 'nothing to show');
+  });
+});
+
+describe('iterative recipe Overview: the section shells are single cards (issue 3044)', () => {
+  it('draws Step mode and Working the recipe as one card each on a single step', async () => {
+    const world = ironworks();
+    await mountEditor(world, await draftOf(world, 'iw-r-hinge'));
+    assertOneCard(target, 'recipe-step-mode', 'Step mode', { note: true });
+    assertOneCard(target, 'iterative-step', 'Working the recipe', { note: true });
+    assert.ok(Boolean($('[data-recipe-section="recipe-step-mode"] .fab-card-trailing')));
+    assert.ok(Boolean($(`${STEP_CARD} [data-iterative-step-lock="temper"]`)), 'the config renders');
+  });
+
+  it('draws Step mode and the Steps card as one card each on a multi-step recipe', async () => {
+    const world = ironworks();
+    await mountEditor(world, await draftOf(world, 'iw-r-sword'));
+    assertOneCard(target, 'recipe-step-mode', 'Step mode', { note: true });
+    assertOneCard(target, 'steps', 'Steps', { note: true });
+    assert.ok(!$(STEP_CARD), 'a multi-step recipe has no single-step card');
   });
 });
 

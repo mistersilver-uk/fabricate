@@ -3463,7 +3463,7 @@
           "OpenComponentDifficulty": "Edit difficulty and complications on the component",
           "Instantaneous": "Instantaneous",
           "Duration": "Duration",
-          "DurationHint": "How long this recipe takes to craft. Leave blank for an instant craft.",
+          "DurationHint": "How long this recipe takes to craft. Leave at zero for an instant craft.",
           "AddDuration": "Add duration",
           "EditDuration": "Edit duration",
           "DurationClearHint": "Right-click to clear",
