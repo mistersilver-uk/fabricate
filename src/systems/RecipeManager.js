@@ -1520,7 +1520,7 @@ export class RecipeManager {
   }
 
   /** Import recipes from JSON. A recipe refused activation only for `iterativeNotReady` is stored
-   * disabled; any other refusal is SKIPPED AND REPORTED in ONE aggregated conflict report. */
+   * disabled; any other refusal is skipped and reported in one aggregated conflict report. */
   async importRecipes(recipesData, overwrite = false) {
     this._assertGM('import recipes');
 

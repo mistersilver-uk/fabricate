@@ -336,7 +336,7 @@ export class CompendiumImporter {
       const packSystemId = systemData.id || system.id;
 
       // --- Phase 4: Import recipes ---
-      // Each recipe writes the map only (`persist: false`) and fails alone; ONE `save()` follows.
+      // Each recipe writes the map only (`persist: false`) and fails alone; one `save()` follows.
       const iterative = system.resolutionMode === 'iterative';
       let processedRecipes = 0;
       for (const recipeData of recipesData) {
@@ -416,7 +416,7 @@ export class CompendiumImporter {
         await this._recipeManager.save?.();
       }
 
-      // ONE bulk flag cleanup after the prune, naming the ids it pruned (issue 1226): the gate
+      // One bulk flag cleanup after the prune, naming the ids it pruned (issue 1226): the gate
       // prunes exactly those when the corpus cannot be attested complete.
       if (summary.recipes.pruned > 0) {
         await this._recipeManager.cleanupOrphanedRecipeFlags?.({
