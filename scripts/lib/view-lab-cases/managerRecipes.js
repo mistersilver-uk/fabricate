@@ -71,11 +71,14 @@ export const CASES = Object.freeze([
     // Tempered Blade sorts last, below the fold.
     steps: ['Crafting', { selector: ITERATIVE_ROW('iw-r-blade'), scroll: true }],
     expectView: 'recipes',
-    // One pill per row: Ingot needs setup, Nail blocks, Blade is ready, and Hinge, which activation
-    // refuses, wears Incomplete and no Ready.
+    // Ingot needs setup and Nail blocks, each beside the Incomplete pill its enable blocker draws, as
+    // Rivet and Sword wear too; Blade is ready, and Hinge, which activation refuses, wears
+    // Incomplete and no Ready.
     expectSelector:
       `.fabricate-manager:has(${ITERATIVE_ROW('iw-r-ingot')} [data-recipe-status="iterativeSetup"])` +
+      `:has(${ITERATIVE_ROW('iw-r-ingot')} [data-recipe-status="incomplete"])` +
       `:has(${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="iterativeBlocking"])` +
+      `:has(${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="incomplete"])` +
       `:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="incomplete"])` +
       `:not(:has(${ITERATIVE_ROW('iw-r-hinge')} [data-recipe-status="iterativeReady"])) ` +
       `${ITERATIVE_ROW('iw-r-blade')} [data-recipe-status="iterativeReady"]`,
@@ -91,6 +94,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/iterative\/iterative(?:RecipeIssues|HeaderCopy)\.js$/,
       /^src\/ui\/svelte\/stores\/recipeIterativeStatus\.js$/,
       /^src\/ui\/model\/recipeBrowserModel\.js$/,
+      /^src\/systems\/recipeValidation\.js$/,
+      /^src\/systems\/iterative\/iterativeCraftGate\.js$/,
     ],
   }),
   managerCase({

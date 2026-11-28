@@ -838,6 +838,15 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
       ['incomplete'],
       'Hinge is ready by its issues, but activation refuses it, so it wears no Ready'
     );
+    // The frame's selector, clause by clause: happy-dom misreads a `:has()` over a compound with
+    // attribute values, and cannot match `:not(:has())`, whose one clause is Hinge's assertion above.
+    const { expectSelector } = getCaseById('manager-recipes-iterative');
+    const clauses = [...expectSelector.matchAll(/(?<!:not\():has\(([^()]*)\)/g)].map(([, arg]) => arg);
+    clauses.push(expectSelector.slice(expectSelector.lastIndexOf(') ') + 2));
+    assert.equal(clauses.length, 6, 'five pill clauses and Blade’s Ready');
+    for (const clause of clauses) {
+      assert.ok(Boolean(document.querySelector(clause)), `the iterative status frame lacks ${clause}`);
+    }
   });
 
   it('flashes a refused iterative enable with its blocking count, as the capture case draws it', async () => {
