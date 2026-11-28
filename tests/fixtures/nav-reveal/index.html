@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Manager nav reveal — the real nav rows on the real runtime</title>
+    <!--
+      Served by `tests/components/manager-nav-reveal-rendered.test.js` from a Vite dev server, so
+      `mount.js` mounts the real `NavSidebar` rows and an active row's reveal runs against real
+      layout (issue 3030).
+    -->
+    <link rel="stylesheet" href="/@nav-reveal-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="./mount.js"></script>
+  </body>
+</html>

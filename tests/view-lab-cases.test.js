@@ -4826,12 +4826,19 @@ test('changed files map to the windows they affect', () => {
     'manager-gathering-task-editor-normal',
     // Its Hearth & Herb variant (issue 2151), which a palette's token change is photographed in.
     'manager-gathering-task-editor-normal-hearth-herb',
+    // Issue 3030: the side rails below the 1120px rung, where a partial's rail rules change them.
+    'manager-gathering-task-editor-stacked',
+    'manager-gathering-task-editor-straight-narrow',
+    'manager-knowledge-narrow',
     'manager-recipe-edit-ingredients',
     'manager-recipe-edit-ingredients-sets',
     // Issue 2513: the Overview's routing card, whose rules sit in the recipe-editor sheet.
     'manager-recipe-edit-overview-routing-check',
+    'manager-recipe-edit-results-narrow',
     'manager-recipe-edit-results-routed-shared',
+    'manager-tool-parity-06-breakage-900x700',
     'manager-world-downtime-collapsed',
+    'manager-world-downtime-narrow-settings',
     'manager-world-downtime-tracking',
   ]);
 

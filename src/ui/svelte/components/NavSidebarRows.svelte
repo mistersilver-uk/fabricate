@@ -15,7 +15,8 @@
   - A row with no `active` carries exactly its base class; a disabled row or locked chevron is
     described by a visually hidden reason — pinned by `tests/components/nav-sidebar-mounted.test.js`.
   - A `tierGated` row draws the premium padlock after its marks, hidden from assistive technology;
-    a `reveal` row scrolls itself into view, once each time it starts revealing (issue 1213).
+    a `reveal` row, and the active row, scroll themselves into view within the nav, once each time
+    they start revealing (issues 1213, 3030).
 -->
 <script>
   let { entries = [], itemClass = '', groupClasses = {}, childClasses = {} } = $props();
@@ -28,10 +29,55 @@
 
   const reasonId = (domId) => `${domId}-reason`;
 
-  // A stable function, so a row that stays revealed across re-renders is not scrolled again.
+  const scrolls = (element) =>
+    /auto|scroll/.test(globalThis.getComputedStyle(element).overflowY) &&
+    element.scrollHeight > element.clientHeight;
+
+  // The nav when it scrolls, else the nearest scrolling ancestor up to the rail (a stacked rail
+  // scrolls whole, its nav being `overflow: visible`). Never the page or the window.
+  function scrollerOf(nav) {
+    if (scrolls(nav)) return nav;
+    const rail = nav.closest('.manager-rail');
+    for (let ancestor = rail && nav.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (scrolls(ancestor)) return ancestor;
+      if (ancestor === rail) break;
+    }
+    return null;
+  }
+
+  // Moves that scroller's own `scrollTop` and only when the row is clipped, so a row already in
+  // view does not scroll (issue 3030). A row with no box (a collapsed rail hides its sub-items)
+  // has nothing to reveal, and a pinned block over the scroller's top edge hides what is beneath it.
+  function scrollNavTo(node) {
+    const nav = node.closest('.manager-nav');
+    if (!nav || !node.getClientRects().length) return;
+    const scroller = scrollerOf(nav);
+    if (!scroller) return;
+    const row = node.getBoundingClientRect();
+    let top = scroller.getBoundingClientRect().top + scroller.clientTop;
+    for (const child of scroller.children) {
+      if (globalThis.getComputedStyle(child).position === 'sticky') {
+        top = Math.max(top, child.getBoundingClientRect().bottom);
+      }
+    }
+    const bottom =
+      scroller.getBoundingClientRect().top + scroller.clientTop + scroller.clientHeight;
+    if (row.top < top) scroller.scrollTop += row.top - top;
+    else if (row.bottom > bottom) scroller.scrollTop += row.bottom - bottom;
+  }
+
+  // A stable function, so a row that stays revealed across re-renders is not scrolled again. It
+  // checks again when the nav or its rail changes size (a window resize, a web font swapping in),
+  // so the active row is not left clipped by a scroller that shrank after it mounted.
   function revealRow(node) {
-    // happy-dom does not implement it, hence the optional call.
-    node.scrollIntoView?.({ block: 'nearest' });
+    scrollNavTo(node);
+    const nav = node.closest('.manager-nav');
+    if (!nav || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => scrollNavTo(node));
+    observer.observe(nav);
+    const rail = nav.closest('.manager-rail');
+    if (rail) observer.observe(rail);
+    return () => observer.disconnect();
   }
 </script>
 
@@ -52,7 +98,7 @@
     aria-describedby={item.disabledReason ? reasonId(item.domId) : item.ariaDescribedBy}
     disabled={item.disabled}
     onclick={item.onSelect}
-    {@attach item.reveal && revealRow}
+    {@attach (item.reveal || item.active) && revealRow}
   >
     <i class={item.icon} aria-hidden="true"></i>
     <span class="manager-nav-label" id={item.labelId}>{item.label}</span>
