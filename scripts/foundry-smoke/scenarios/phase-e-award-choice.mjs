@@ -30,6 +30,9 @@ const PICK_ID = 'smoke-award-pick';
 const PICKS = Object.freeze(['charm', 'coin', 'lore']);
 // The stage's own charm and the `1d1+9` draw's three, which only a total of 10 reaches.
 const STAGE_CHARMS = 1 + 3;
+const DRAW_SELECTIONS = '[{"alternativeId":"high","roll":{"formula":"1d1+9","total":10}}]';
+const POLL_MS = 250;
+const DWELL_MS = 1500;
 
 /** One named step: its body's detail on success, its message on failure. */
 async function runStep(ctx, step, body) {
@@ -183,7 +186,10 @@ async function seedAwardForge(page, crafterId, forge) {
   );
 }
 
-/** The crafter's charms, gp and learned entry, its latest run of the recipe, and the card count. */
+/**
+ * The crafter's charms with each stack's stored source and quantity, gp and learned entry, its
+ * latest run of the recipe with the stage's consumption, and the card count.
+ */
 async function readWorld(page, { crafterId, recipeId, loreId, charmName }) {
   return await page.evaluate(
     ({ crafterId, recipeId, loreId, charmName, gpPath }) => {
@@ -194,10 +200,20 @@ async function readWorld(page, { crafterId, recipeId, loreId, charmName }) {
         (entry) => entry?.recipeId === recipeId
       );
       const [step] = run?.steps ?? [];
+      const charms = crafter.items.contents.filter((item) => item.name === charmName);
       return {
-        charms: crafter.items.contents
-          .filter((item) => item.name === charmName)
-          .reduce((sum, item) => sum + (Number(item.system?.quantity) || 1), 0),
+        charms: charms.reduce((sum, item) => sum + (Number(item.system?.quantity) || 1), 0),
+        charmStacks: charms.map((item) => ({
+          id: item.id,
+          quantity: item._source.system?.quantity ?? null,
+          compendiumSource: item._stats?.compendiumSource ?? null,
+          duplicateSource: item._stats?.duplicateSource ?? null,
+          // Core migrates a stored sourceId into _stats.compendiumSource; the descriptor read
+          // never runs a getter.
+          sourceId:
+            Object.getOwnPropertyDescriptor(item._source.flags?.core ?? {}, 'sourceId')?.value ??
+            null,
+        })),
         gp: Number(foundry.utils.getProperty(crafter, gpPath) ?? 0),
         learned: crafter.getFlag('fabricate', 'fabricate.learnedRecipes')?.[loreId] ?? null,
         cards: game.messages.contents.filter((message) =>
@@ -218,12 +234,152 @@ async function readWorld(page, { crafterId, recipeId, loreId, charmName }) {
                 )
               ),
               groupAwards: foundry.utils.deepClone(step?.groupAwards ?? []),
+              consumedSummary: foundry.utils.deepClone(
+                step?.preparedConsumption?.consumedSummary ?? null
+              ),
             }
           : null,
       };
     },
     { crafterId, recipeId, loreId, charmName, gpPath: GP_PATH }
   );
+}
+
+/**
+ * `readWorld` every 250 ms: the first read `expect` holds on, else the last at `timeout`. With
+ * `minDwell`, a negative check: the first read `expect` fails on, else the last after `minDwell`.
+ */
+export async function readSettled(page, args, expect, { timeout = 10_000, minDwell = 0 } = {}) {
+  const started = Date.now();
+  for (;;) {
+    const read = await readWorld(page, args);
+    const holds = expect(read);
+    const elapsed = Date.now() - started;
+    if (minDwell > 0 ? !holds || elapsed >= minDwell : holds || elapsed >= timeout) return read;
+    await page.waitForTimeout(POLL_MS);
+  }
+}
+
+/** The message of the first `[holds, message]` check that does not hold, else null. */
+function firstFault(checks) {
+  return checks.find(([holds]) => !holds)?.[1] ?? null;
+}
+
+/** A poll predicate over a step's fault function: held exactly when it finds no fault. */
+function held(fault) {
+  return (read) => fault(read) === null;
+}
+
+/** A charm stack at a stored quantity of 0 or less, or a stack `before` held that is gone or fell. */
+export function ledgerFault(before, read) {
+  const spent = read.charmStacks.find(({ quantity: q }) => Number.isFinite(q) && q <= 0);
+  if (spent) return `charm stack ${spent.id} stores quantity ${spent.quantity}`;
+  const now = new Map(read.charmStacks.map(({ id, quantity }) => [id, quantity]));
+  const gone = before.charmStacks.find(({ id }) => !now.has(id));
+  if (gone) return `charm stack ${gone.id} vanished`;
+  const fell = before.charmStacks.find(
+    ({ id, quantity: q }) => Number.isFinite(q) && Number.isFinite(now.get(id)) && q > now.get(id)
+  );
+  return fell ? `charm stack ${fell.id} fell from ${fell.quantity} to ${now.get(fell.id)}` : null;
+}
+
+/** What the stage step asserts of its read after the craft; null when all of it holds. */
+export function stageFault(before, read) {
+  const { run } = read;
+  if (!run) return 'no run of the recipe is recorded';
+  const draw = run.groupAwards.find((entry) => entry.choiceId === 'smoke-award-draw');
+  const rows = read.awardRows - before.awardRows;
+  const charms = read.charms - before.charms;
+  return (
+    ledgerFault(before, read) ??
+    firstFault([
+      [run.status === 'succeeded', `the run is ${run.status}`],
+      [
+        Boolean(run.choice) && run.choice.settledAt == null,
+        `the pick is ${JSON.stringify(run.choice)}`,
+      ],
+      [rows === 1, `the stage card carries ${rows} award rows`],
+      [charms === STAGE_CHARMS, `the stage awarded ${charms} charms, not ${STAGE_CHARMS}`],
+      [
+        JSON.stringify(draw?.selections) === DRAW_SELECTIONS,
+        `the draw recorded ${JSON.stringify(draw)}`,
+      ],
+      [read.gp === before.gp && !read.learned, 'the pick awarded before it was made'],
+    ])
+  );
+}
+
+/**
+ * What the pick step asserts of its read after the settle; null when all of it holds. The ledger
+ * runs against `staged`'s stacks too, so a stack gone between the two steps is named.
+ */
+export function pickFault(before, staged, read) {
+  const { run } = read;
+  if (!run) return 'no run of the recipe is recorded';
+  const { choice } = run;
+  const settledAward = run.groupAwards.find((entry) => entry.choiceId === PICK_ID);
+  const awarded = (settledAward?.selections ?? []).map((entry) => entry.alternativeId);
+  const gp = read.gp - before.gp;
+  const charms = read.charms - before.charms;
+  const cards = read.cards - before.cards;
+  return (
+    ledgerFault(before, read) ??
+    ledgerFault(staged, read) ??
+    firstFault([
+      [gp === CREDIT, `gp rose by ${gp}`],
+      [read.learned?.granted === true, `learned: ${JSON.stringify(read.learned)}`],
+      [charms === 1, `the picked charm awarded ${charms}`],
+      [
+        choice?.outcome === 'awarded' && JSON.stringify(choice.picks) === JSON.stringify(PICKS),
+        `the choice settled ${JSON.stringify(choice)}`,
+      ],
+      [awarded.join(',') === PICKS.join(','), `the group award is ${JSON.stringify(settledAward)}`],
+      [run.awardChoiceJournal === 'committed', `the award journal is ${run.awardChoiceJournal}`],
+      [run.runRevision > staged.revision, 'the run revision did not advance'],
+      [cards === 1, `${cards} cards posted`],
+    ])
+  );
+}
+
+/** The observer's refusal must leave gp and the run revision as `before` had them. */
+export function observerFault(before, read) {
+  if (!read.run) return 'no run of the recipe is recorded';
+  const unchanged = read.gp === before.gp && read.run.runRevision === before.run.runRevision;
+  return unchanged ? null : 'the refused settle changed the run';
+}
+
+/** The replay must leave gp, charms, cards and every charm stack as the pick left them. */
+export function replayFault(after, read) {
+  if (!read.run) return 'no run of the recipe is recorded';
+  const unchanged =
+    read.gp === after.gp && read.charms === after.charms && read.cards === after.cards;
+  return ledgerFault(after, read) ?? (unchanged ? null : 'awarded again');
+}
+
+/**
+ * The pick's read: the first `fault` finds nothing in, then held across a dwell, so a late award
+ * from this settle is named at the pick and not by the replay. Answers the read and its fault.
+ */
+export async function settlePick(page, args, fault) {
+  const after = await readSettled(page, args, held(fault));
+  const failure = fault(after);
+  if (failure) return { read: after, failure };
+  const rested = await readSettled(page, args, held(fault), { minDwell: DWELL_MS });
+  return { read: rested, failure: fault(rested) };
+}
+
+/** One read's charm ledger: the count, each stack, and the stage's recorded consumption. */
+function charmLedger(read) {
+  return {
+    charms: read.charms,
+    stacks: read.charmStacks,
+    consumed: read.run?.consumedSummary ?? null,
+  };
+}
+
+/** A step failure that carries the charm ledger, so a red run names its class of fault. */
+function ledgerError(message, ledger) {
+  return new Error(`${message}; charm ledger ${JSON.stringify(ledger)}`);
 }
 
 /** The run's Journal projection as the GM reads it, and a refused dismissal. */
@@ -297,8 +453,8 @@ function assertCleanConsole(client, label) {
 async function proveStageOwesPick(ctx, forge) {
   const { page } = ctx;
   const { crafterId } = ctx.shared.cleanup;
-  const read = () => readWorld(page, { crafterId, ...forge });
-  const before = await read();
+  const before = await readWorld(page, { crafterId, ...forge });
+  const ledger = { before: charmLedger(before) };
   const answer = await withinTime(
     page.evaluate(
       async ({ crafterId, recipeId }) => {
@@ -319,46 +475,33 @@ async function proveStageOwesPick(ctx, forge) {
     60_000,
     'the award craft never settled'
   );
-  if (answer.success !== true) throw new Error(`the craft failed: ${answer.message}`);
-  if (!answer.awardChoicePending) throw new Error('the craft reply names no pending pick');
-  const after = await read();
-  if (after.run?.status !== 'succeeded') throw new Error(`the run is ${after.run?.status}`);
-  if (!after.run.choice || after.run.choice.settledAt != null) {
-    throw new Error(`the pick is ${JSON.stringify(after.run.choice)}`);
+  if (answer.success !== true) throw ledgerError(`the craft failed: ${answer.message}`, ledger);
+  if (!answer.awardChoicePending) {
+    throw ledgerError('the craft reply names no pending pick', ledger);
   }
-  if (after.awardRows - before.awardRows !== 1) {
-    throw new Error(`the stage card carries ${after.awardRows - before.awardRows} award rows`);
-  }
-  if (after.charms - before.charms !== STAGE_CHARMS) {
-    throw new Error(
-      `the stage awarded ${after.charms - before.charms} charms, not ${STAGE_CHARMS}`
-    );
-  }
-  const draw = after.run.groupAwards.find((entry) => entry.choiceId === 'smoke-award-draw');
-  if (
-    JSON.stringify(draw?.selections) !==
-    '[{"alternativeId":"high","roll":{"formula":"1d1+9","total":10}}]'
-  ) {
-    throw new Error(`the draw recorded ${JSON.stringify(draw)}`);
-  }
-  if (after.gp !== before.gp || after.learned)
-    throw new Error('the pick awarded before it was made');
+  const fault = (read) => stageFault(before, read);
+  const after = await readSettled(page, { crafterId, ...forge }, held(fault));
+  ledger.after = charmLedger(after);
+  const stageFailure = fault(after);
+  if (stageFailure) throw ledgerError(stageFailure, ledger);
   const journal = await readJournal(page, { crafterId, runId: after.run.id });
   if (!journal.listedActive || !journal.pending || !journal.chooseAward || journal.dismiss) {
-    throw new Error(`the Journal projects ${JSON.stringify(journal)}`);
+    throw ledgerError(`the Journal projects ${JSON.stringify(journal)}`, ledger);
   }
   if (journal.dismissal !== 'award-choice-pending') {
-    throw new Error(`dismissal answered ${journal.dismissal}`);
+    throw ledgerError(`dismissal answered ${journal.dismissal}`, ledger);
   }
   const actorUuid = await page.evaluate((id) => game.actors.get(id).uuid, crafterId);
-  return { runId: after.run.id, actorUuid, revision: after.run.runRevision, charms: after.charms };
+  const { id: runId, runRevision: revision } = after.run;
+  const { charms, charmStacks } = after;
+  return { runId, actorUuid, revision, charms, charmStacks, ledger };
 }
 
 /** An observer who does not own the crafter is refused `owner-required`, and nothing changes. */
 async function proveObserverRefused(ctx, forge, staged, requestId) {
   const { page } = ctx;
-  const read = () => readWorld(page, { crafterId: ctx.shared.cleanup.crafterId, ...forge });
-  const before = await read();
+  const args = { crafterId: ctx.shared.cleanup.crafterId, ...forge };
+  const before = await readWorld(page, args);
   const observer = await joinAs(page, OBSERVER);
   try {
     const refused = await withinTime(
@@ -373,10 +516,10 @@ async function proveObserverRefused(ctx, forge, staged, requestId) {
     if (refused?.reason !== 'owner-required') {
       throw new Error(`the observer was answered ${JSON.stringify(refused)}`);
     }
-    const after = await read();
-    if (after.gp !== before.gp || after.run.runRevision !== before.run.runRevision) {
-      throw new Error('the refused settle changed the run');
-    }
+    const fault = (read) => observerFault(before, read);
+    const after = await readSettled(page, args, held(fault), { minDwell: DWELL_MS });
+    const observerFailure = fault(after);
+    if (observerFailure) throw new Error(observerFailure);
     assertCleanConsole(observer, 'observer');
     return { reason: refused.reason };
   } finally {
@@ -386,55 +529,36 @@ async function proveObserverRefused(ctx, forge, staged, requestId) {
 
 /**
  * The player's pick of all three: credited, taught, one charm created, recorded once with one
- * card, and a replay awarding nothing.
+ * card and holding across a 1.5 s dwell, and a replay awarding nothing.
  */
 async function provePlayerPick(ctx, forge, staged, requestId) {
   const { page } = ctx;
-  const { crafterId } = ctx.shared.cleanup;
-  const read = () => readWorld(page, { crafterId, ...forge });
-  const before = await read();
+  const args = { crafterId: ctx.shared.cleanup.crafterId, ...forge };
+  const before = await readWorld(page, args);
+  const ledger = { before: charmLedger(before) };
   const player = await joinAs(page, PLAYER);
   const expectedRevision = before.run.runRevision;
   const send = () => chooseFrom(player.clientPage, { ...staged, expectedRevision, requestId });
   try {
     const settled = await withinTime(send(), 60_000, 'the player settle never answered');
     if (settled?.success !== true) {
-      throw new Error(`the settle was refused: ${settled?.reason} ${settled?.message ?? ''}`);
+      const reason = `${settled?.reason} ${settled?.message ?? ''}`;
+      throw ledgerError(`the settle was refused: ${reason}`, ledger);
     }
-    await page.waitForTimeout(1500);
-    const after = await read();
-    const { choice } = after.run;
-    if (after.gp - before.gp !== CREDIT) throw new Error(`gp rose by ${after.gp - before.gp}`);
-    if (after.learned?.granted !== true)
-      throw new Error(`learned: ${JSON.stringify(after.learned)}`);
-    if (after.charms - before.charms !== 1) {
-      throw new Error(`the picked charm awarded ${after.charms - before.charms}`);
-    }
-    if (choice?.outcome !== 'awarded' || JSON.stringify(choice.picks) !== JSON.stringify(PICKS)) {
-      throw new Error(`the choice settled ${JSON.stringify(choice)}`);
-    }
-    const settledAward = after.run.groupAwards.find((entry) => entry.choiceId === PICK_ID);
-    if (
-      (settledAward?.selections ?? []).map((entry) => entry.alternativeId).join(',') !==
-      PICKS.join(',')
-    ) {
-      throw new Error(`the group award is ${JSON.stringify(settledAward)}`);
-    }
-    if (after.run.awardChoiceJournal !== 'committed') {
-      throw new Error(`the award journal is ${after.run.awardChoiceJournal}`);
-    }
-    if (!(after.run.runRevision > staged.revision))
-      throw new Error('the run revision did not advance');
-    if (after.cards - before.cards !== 1)
-      throw new Error(`${after.cards - before.cards} cards posted`);
+    const fault = (read) => pickFault(before, staged, read);
+    const { read: after, failure: pickFailure } = await settlePick(page, args, fault);
+    ledger.after = charmLedger(after);
+    if (pickFailure) throw ledgerError(pickFailure, ledger);
     const replay = await withinTime(send(), 60_000, 'the replayed settle never answered');
-    await page.waitForTimeout(1500);
-    const again = await read();
-    if (again.gp !== after.gp || again.charms !== after.charms || again.cards !== after.cards) {
-      throw new Error(`the replay (${JSON.stringify(replay)}) awarded again`);
+    const replayed = (read) => replayFault(after, read);
+    const again = await readSettled(page, args, held(replayed), { minDwell: DWELL_MS });
+    ledger.replay = charmLedger(again);
+    const replayFailure = replayed(again);
+    if (replayFailure) {
+      throw ledgerError(`the replay (${JSON.stringify(replay)}) ${replayFailure}`, ledger);
     }
     assertCleanConsole(player, 'player');
-    return { replayed: replay?.success === true, replayReason: replay?.reason ?? null };
+    return { replayed: replay?.success === true, replayReason: replay?.reason ?? null, ledger };
   } finally {
     await player.context.close().catch(() => {});
   }
