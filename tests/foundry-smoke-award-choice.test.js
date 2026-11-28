@@ -18,13 +18,19 @@ import {
 const ARGS = Object.freeze({ crafterId: 'a1', recipeId: 'r', loreId: 'l', charmName: 'Charm' });
 const DRAW = { alternativeId: 'high', roll: { formula: '1d1+9', total: 10 } };
 const PICKS = ['charm', 'coin', 'lore'];
+// A poll that never returns fails its test, and the read cap ends its loop so the run exits.
+const BOUNDED = Object.freeze({ timeout: 5000 });
+const READ_CAP = 1000;
 
-/** A GM page whose `readWorld` answers `reads` in turn, then the last one for ever. */
+/** A GM page whose `readWorld` answers `reads` in turn, then the last one up to `READ_CAP`. */
 function fakePage(reads) {
   const waits = [];
   let served = 0;
   const page = {
-    evaluate: async () => structuredClone(reads[Math.min(served++, reads.length - 1)]),
+    evaluate: async () => {
+      if (served >= READ_CAP) throw new Error(`the poll read past ${READ_CAP} reads`);
+      return structuredClone(reads[Math.min(served++, reads.length - 1)]);
+    },
     waitForTimeout: (ms) => {
       waits.push(ms);
       return new Promise((resolve) => setTimeout(resolve, 1));
@@ -154,11 +160,14 @@ describe('readSettled, positive', () => {
     assert.deepStrictEqual(waits, [250, 250]);
   });
 
-  it('answers the last read at the timeout, for the step to report on', async () => {
+  it('answers the last read at the timeout, for the step to report on', BOUNDED, async () => {
     const short = broken(STAGED_READ, (r) => (r.awardRows = 1));
-    const { page, served } = fakePage([short]);
+    // The stage predicate ignores `cards`, so it marks the last read.
+    const last = broken(short, (r) => (r.cards = 99));
+    const { page, served } = fakePage([short, last]);
     const read = await readSettled(page, ARGS, stageHolds, { timeout: 30 });
-    assert.ok(served() > 1, 'it polled before giving up');
+    assert.ok(served() > 2, 'it polled before giving up');
+    assert.equal(read.cards, 99);
     assert.match(stageFault(STAGE_BEFORE, read), /carries 0 award rows/);
   });
 
@@ -205,12 +214,15 @@ describe('readSettled, negative with a dwell', () => {
     assert.equal(observerFault(STAGED_READ, read), 'the refused settle changed the run');
   });
 
-  it('holds on every read across the dwell before answering the last', async () => {
-    const { page, served } = fakePage([PICKED_READ]);
+  it('holds on every read across the dwell before answering the last', BOUNDED, async () => {
+    // The replay predicate ignores `consumedSummary`, so it marks the last read.
+    const last = broken(PICKED_READ, (r) => (r.run.consumedSummary = { last: true }));
+    const { page, served } = fakePage([PICKED_READ, last]);
     const started = Date.now();
     const read = await readSettled(page, ARGS, replayHolds, { minDwell: 40 });
     assert.ok(Date.now() - started >= 40, 'it dwelt');
-    assert.ok(served() > 1, 'it read more than once');
+    assert.ok(served() > 2, 'it read more than once');
+    assert.deepStrictEqual(read.run.consumedSummary, { last: true });
     assert.equal(replayFault(PICKED_READ, read), null);
   });
 
