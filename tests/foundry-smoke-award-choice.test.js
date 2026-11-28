@@ -12,6 +12,7 @@ import {
   pickFault,
   readSettled,
   replayFault,
+  settlePick,
   stageFault,
 } from '../scripts/foundry-smoke/scenarios/phase-e-award-choice.mjs';
 
@@ -247,6 +248,22 @@ describe('readSettled, negative with a dwell', () => {
       observerFault(STAGED_READ, { ...STAGED_READ, run: null }),
       'no run of the recipe is recorded'
     );
+  });
+});
+
+describe('settlePick', () => {
+  const fault = (read) => pickFault(STAGED_READ, { revision: 2 }, read);
+
+  it('names a late extra award after the pick holds at the pick, not the replay', BOUNDED, async () => {
+    const extra = broken(PICKED_READ, (r) => {
+      r.charms = 6;
+      r.charmStacks.push(stack('c4', 1));
+    });
+    const { page, served } = fakePage([PICKED_READ, PICKED_READ, extra]);
+    const { read, failure } = await settlePick(page, ARGS, fault);
+    assert.equal(served(), 3);
+    assert.equal(failure, 'the picked charm awarded 2');
+    assert.equal(read.charms, 6);
   });
 });
 

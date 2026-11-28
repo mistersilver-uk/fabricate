@@ -351,6 +351,18 @@ export function replayFault(after, read) {
   return ledgerFault(after, read) ?? (unchanged ? null : 'awarded again');
 }
 
+/**
+ * The pick's read: the first `fault` finds nothing in, then held across a dwell, so a late award
+ * from this settle is named at the pick and not by the replay. Answers the read and its fault.
+ */
+export async function settlePick(page, args, fault) {
+  const after = await readSettled(page, args, held(fault));
+  const failure = fault(after);
+  if (failure) return { read: after, failure };
+  const rested = await readSettled(page, args, held(fault), { minDwell: DWELL_MS });
+  return { read: rested, failure: fault(rested) };
+}
+
 /** One read's charm ledger: the count, each stack, and the stage's recorded consumption. */
 function charmLedger(read) {
   return {
@@ -511,7 +523,7 @@ async function proveObserverRefused(ctx, forge, staged, requestId) {
 
 /**
  * The player's pick of all three: credited, taught, one charm created, recorded once with one
- * card, and a replay awarding nothing.
+ * card and holding across a 1.5 s dwell, and a replay awarding nothing.
  */
 async function provePlayerPick(ctx, forge, staged, requestId) {
   const { page } = ctx;
@@ -528,9 +540,8 @@ async function provePlayerPick(ctx, forge, staged, requestId) {
       throw ledgerError(`the settle was refused: ${reason}`, ledger);
     }
     const fault = (read) => pickFault(before, staged, read);
-    const after = await readSettled(page, args, held(fault));
+    const { read: after, failure: pickFailure } = await settlePick(page, args, fault);
     ledger.after = charmLedger(after);
-    const pickFailure = fault(after);
     if (pickFailure) throw ledgerError(pickFailure, ledger);
     const replay = await withinTime(send(), 60_000, 'the replayed settle never answered');
     const replayed = (read) => replayFault(after, read);
