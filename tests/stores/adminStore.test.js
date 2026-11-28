@@ -18,6 +18,8 @@ import {
   REPORTER_ENRICHER_DESCRIPTION,
   REPORTER_RESOLVED_EXPECTED,
 } from '../helpers/enricherDescriptionFixtures.js';
+import { buildLabContent } from '../view-lab/world/labContent.js';
+import { seedIterativeRecipes, seedIterativeState } from '../view-lab/world/labIterative.js';
 
 // Mock helpers
 
@@ -3506,6 +3508,30 @@ describe('createAdminStore', () => {
       assert.equal(store.describeComponentDelete(['comp-1', 'ghost']).deletable, 1);
       assert.equal(store.describeComponentDelete(['ghost']).deletable, 0);
       assert.equal(store.describeComponentDelete([]).deletable, 0);
+    });
+
+    it('describeComponentDelete counts under the system’s mode, so Chain Link survives in iterative', async () => {
+      // Chain Link's step 1 has no result set, and here also accepts a steel blade.
+      const content = buildLabContent();
+      seedIterativeState(content, 'populated');
+      seedIterativeRecipes(content, [], 'chain');
+      const chain = content.recipes.find((entry) => entry.id === 'iw-r-chain');
+      chain.steps[0].ingredientSets[0].ingredientGroups[0].options.push({
+        componentId: 'iw-steel-blade',
+        quantity: 1,
+      });
+      const disabledUnder = async (resolutionMode) => {
+        const services = createMockServices();
+        const sys = services.getCraftingSystemManager().getSystem('sys1');
+        Object.assign(sys, { resolutionMode, components: [makeItem({ id: 'iw-steel-blade' })] });
+        delete sys.items;
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        services.getRecipeManager = () => ({ getRecipes: () => [chain] });
+        return store.describeComponentDelete(['iw-steel-blade']).recipesDisabled;
+      };
+      assert.equal(await disabledUnder('iterative'), 0);
+      assert.equal(await disabledUnder('routedByCheck'), 1, 'step 1 needs a set outside iterative');
     });
 
     it('describeComponentDelete returns the zero impact rather than throwing', async () => {
