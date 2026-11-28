@@ -110,7 +110,8 @@ export const CASES = Object.freeze([
     expectView: 'recipes',
     expectSelector:
       `.fabricate-manager:has(${ITERATIVE_ROW('iw-r-nail')} [data-recipe-status="blocked"]) ` +
-      '.fab-notice[data-recipe-flash][role="alert"]:has(.fab-notice-title) [data-notice-dismiss]',
+      '.fab-notice[data-recipe-flash][role="alert"]:has(.fab-notice-title):has(.fab-notice-detail) ' +
+      '[data-notice-dismiss]',
     allowedConsoleErrors: [/Fabricate \| Failed to toggle recipe enabled state/],
     expectContained: [{ container: '.manager-main', target: '[data-recipe-flash]' }],
     expectCenterHit: ITERATIVE_TOGGLE('iw-r-nail'),
