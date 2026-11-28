@@ -195,8 +195,11 @@ Keep it at **single root-class** specificity (`.fabricate button:focus-visible`,
 Do not add scoped focus CSS in components — it duplicates the module block and needs a Svelte rebuild, whereas `styles/fabricate.css` is served directly.
 A new top-level app surface inherits that paired block automatically; write a per-area block only where a surface deliberately needs a different treatment, and say why.
 See the "Foundry vs Fabricate CSS overrides" section in `CONTRIBUTING.md`.
-- Core maintains an embedded item's provenance in `_stats.compendiumSource` (and `_stats.duplicateSource` for a duplicate).
-On V13 and V14 `DocumentStatsField._migrateData` moves `flags.core.sourceId` into `_stats.compendiumSource` and deletes the old key, with no compatibility shim (the shims cover `exportSource`), so a stored `sourceId` normally reads absent (checked against 13.336 and later).
+- **`flags.core.sourceId` is a legacy key core migrates away, so read provenance through `getCompendiumSourceUuid` (`src/utils/sourceUuid.js`), never the flag.**
+On V13 and V14 `DocumentStatsField._migrateData` moves `flags.core.sourceId` into `_stats.compendiumSource` and deletes the old key, and no compatibility shim reads it back (the shims cover `exportSource`).
+Gathering result creation (`src/gatheringResultCreation.js`) and Tool replacement (`src/toolBreakageRuntime.js`) still stamp the flag, so the stamp never survives as a flag and reaches readers only through `_stats.compendiumSource`.
+That field and `_stats.duplicateSource` are evidence of descent, not identity, as the provenance rules below say.
+Read from the 13.346 and 14.370 API typings and release notes, not core source.
 - Fabricate runs configured macros through `MacroExecutor.run(uuid, payload)` (`src/utils/MacroExecutor.js`), **not** `Macro#execute`.
 Foundry V13.351 `client/documents/macro.mjs` gates `Macro#execute(scope)` on the current user's Macro permission and requires LIMITED permission.
 Fabricate evaluates the configured command directly so player-initiated crafting can run GM-selected automation; this bypasses only that client-side Macro document gate and grants the current player no additional server or document authority.
@@ -241,7 +244,8 @@ Every write broadcasts `createSetting`/`updateSetting` to every client (the FIRS
 It is per-user **within a world**, not per-account globally — the same player in a second world gets the default.
 Despite being async and replicated, the write is **locally coherent**: the awaited create/update populates the same local collection `ClientSettings#get` reads, so a `get` issued after the `await` returns the new value without waiting on any broadcast.
 The same holds for every awaited Document create, update or delete, not only a setting: it has applied to the requesting client's collection when it resolves, and other clients apply it from the broadcast through the same client database backend handlers.
-A player's Journal command is carried out by the active GM, so its writes are coherent on the GM client once the GM handler's awaited writes finish.
+A player's Journal command runs on the active-GM command authority, so its writes are coherent on the GM client once that handler's awaited writes finish.
+The requesting player's client applies them only from the broadcasts, so a player-side read after the command answers polls until it settles rather than reading once.
 That is what makes **flush-before-read an honest ordering guarantee** rather than a hopeful one — `await` the pending write, then start the operation that captures it (issue 675's salvage panel flushes its debounced order write before `salvage()` captures it onto the run record).
 It also means the failure mode to design for is **rejection, not staleness**.
 `progressiveResultOrder` is a user-scoped Setting document, so a sweep sees and writes only the current user's value, and a whole-object replace can lose a concurrent write from another device of the same user.
@@ -545,8 +549,6 @@ A restore fires `createItem` per document (`noHook` gates only the pre-hook) and
 `deleteEmbeddedDocuments('Item', ids)` fires one `deleteItem` hook per document on V13 and V14, and `foundry.documents.modifyBatch`, the multi-parent transaction, is V14-only while `module.json` declares `minimum: "13"`.
 A batch answers short rather than rejecting: `deleteEmbeddedDocuments` omits a document a `preDelete` hook refused, and `updateEmbeddedDocuments` omits one for a `_preUpdate` refusal, a `preUpdate<Type>` hook refusal, a throwing `updateSource` or the empty-diff drop.
 `collection.get(id, {strict: true})` throws for an id that vanished between plan and write, which rejects the whole batch.
-dnd5e 5.2.5 stores a physical item's `system.quantity` as `NumberField({ integer, min: 0 })`, and core's `NumberField` cleaning clamps to `min`, so a stored negative quantity cannot occur and an overspend stores 0.
-dnd5e merges stacks only for `consumable` items dropped on a sheet, never on `createEmbeddedDocuments`.
 - **A `Macro`'s `command` is a `StringField({ required: true, blank: true })` on EVERY macro type, so `typeof command === 'string'` does not mean "this is a script macro".**
 A `chat`-type macro passes that guard and has its chat text compiled as JavaScript by `MacroExecutor.run` (`src/utils/MacroExecutor.js`), so it throws for any body that is not also valid JS.
 Discriminating script from chat is therefore a **call-site** job, and deliberately not centralised: `MacroExecutor`'s own module docblock (`src/utils/MacroExecutor.js`) records that centralising it would turn a chat-type essence property macro from a silent `console.warn` into a per-essence-per-result error notification, and `tests/macro-executor.test.js` pins that decision as the ABSENCE of `/\.type\b/` and `/script/i` from the module's comment-stripped source.
@@ -557,6 +559,8 @@ Foundry's own handle for one is `fromUuid("Scene.<id>.Token.<id>.Actor.<baseActo
 Only ADDRESSING is the gap — writes route correctly, because `#adjustActorDeltaRequest` rewrites `operation.parentUuid` to `token.delta.uuid` for any embedded write whose parent has a `TokenDocument` ancestor, byte-identical at both builds.
 On 14.365 `TokenDocument#actor` gained an `isLazyDelta && _preventActorDeltaAccess` early return, so it can answer `null` where 13.351 always answered the synthetic actor.
 So a per-actor cache keys by `uuid` first: `GatheringRunManager` keys by its `actorKey` (uuid, then id), and its `invalidateCache` takes the actor itself so callers never re-derive the key (issue 2417).
+- **dnd5e 5.2.5 cannot store a negative stack quantity.** A physical item's `system.quantity` is `NumberField({ integer: true, min: 0 })`, and core's `NumberField` cleaning clamps to `min`, so an overspend stores 0.
+dnd5e merges stacks only for a `consumable` dropped on an actor sheet, never on `createEmbeddedDocuments`, so any merge on a Fabricate create is Fabricate's own `updateItem`.
 - **Reading back a stack quantity reads PREPARED data, not `_source`**, so a re-read is a weaker signal than the write's own return.
 `probeStackQuantityPath`'s `'schema-discard'` verdict exists for exactly this divergence (`probeStackQuantityPath` in `src/systems/itemStackQuantity.js`): `SchemaField._cleanType` deletes keys that are not in the schema, so an off-schema write is discarded while a value some other module or active effect put at the same path still reads fine on the prepared document — and a system whose data preparation recomputes the path masks a successful `_source` write from the other direction.
 Prefer a write's own return when asking "did my write land", and prefer `_source` where a re-read is unavoidable.
