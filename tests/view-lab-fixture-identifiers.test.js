@@ -360,6 +360,7 @@ test('every query.iterativeRecipes names a recipe state the lab seeds, beside an
 const ITERATIVE_RECIPE_CASE_IDS = Object.freeze([
   'manager-recipes-iterative',
   'manager-recipes-iterative-enable-refused',
+  'manager-recipes-iterative-chain-step-empty',
   'manager-recipe-edit-iterative',
   'manager-recipe-edit-iterative-counters-empty',
   'manager-recipe-edit-iterative-counters-no-library',

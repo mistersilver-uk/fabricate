@@ -123,6 +123,35 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipes-iterative-chain-step-empty',
+    label: 'Manager — Recipes inspector on an iterative step with no result set',
+    // `beyond`: the smoke walk never builds an iterative system.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-ironworks', iterative: 'populated', iterativeRecipes: 'chain' },
+    steps: [
+      'Crafting',
+      { selector: `${ITERATIVE_ROW('iw-r-chain')} .manager-recipe-identity` },
+      { selector: '[data-recipe-step-pager]', scroll: true },
+    ],
+    expectView: 'recipes',
+    // Chain Link's step 1 has no result set, which iterative waives (`resultGroupRequired`), so
+    // the note is the neutral muted one and the danger panel is absent.
+    expectSelector:
+      '[data-recipe-inspector]:has([data-recipe-step-name]:has-text("Heat the rod"))' +
+      ':not(:has(.manager-recipe-flow-empty)) ' +
+      '[data-recipe-produces-empty].manager-muted',
+    expectContained: [
+      { container: '[data-recipe-inspector]', target: '[data-recipe-step-pager]' },
+      { container: '[data-recipe-inspector]', target: '[data-recipe-produces-empty]' },
+    ],
+    kinds: ['manager', 'recipes', 'iterative'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/RecipeBrowserInspector\.svelte$/,
+      /^src\/models\/iterativeStepConfig\.js$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-recipes-blocked-enable-flash',
     label: 'Manager — Recipes blocked-enable flash',
     // The flash, which no case reached (issue 1515).

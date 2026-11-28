@@ -1,6 +1,7 @@
 manager-recipes-normal
 manager-recipes-iterative
 manager-recipes-iterative-enable-refused
+manager-recipes-iterative-chain-step-empty
 manager-recipes-blocked-enable-flash
 manager-recipes-inspector-empty-step
 manager-recipes-inspector-cant-enable

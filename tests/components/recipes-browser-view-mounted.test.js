@@ -2108,6 +2108,9 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const waived = root.querySelector('[data-recipe-produces-empty]');
     assert.match(waived.textContent, /only advances the craft/);
     assert.ok(waived.classList.contains('manager-muted'), 'a waived step carries the neutral note');
+    // What `manager-recipes-iterative-chain-step-empty` reads, bar Playwright's `:has-text`.
+    assert.equal(root.querySelector('[data-recipe-step-name]').textContent.trim(), 'Heat the rod');
+    assert.ok(!root.querySelector('.manager-recipe-flow-empty'), 'and no danger panel');
 
     await inspector.setProps({ resolutionMode: 'routedByCheck' });
     const required = root.querySelector('[data-recipe-produces-empty]');
