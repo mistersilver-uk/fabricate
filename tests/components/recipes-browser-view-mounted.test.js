@@ -2085,6 +2085,30 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(empty.textContent, /a successful craft makes nothing/);
   });
 
+  it('iterative: Chain Link step 1 has no result set and reads neutral, unlike in another mode', async () => {
+    const content = buildLabContent();
+    seedIterativeState(content, 'populated');
+    seedIterativeRecipes(content, [], 'chain');
+    const chain = content.recipes.find((entry) => entry.id === 'iw-r-chain');
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({ id: chain.id, name: chain.name, steps: chain.steps }),
+      resolutionMode: 'iterative',
+      recipeCount: 1
+    });
+
+    const waived = root.querySelector('[data-recipe-produces-empty]');
+    assert.match(waived.textContent, /only advances the craft/);
+    assert.ok(waived.classList.contains('manager-muted'), 'a waived step carries the neutral note');
+
+    await inspector.setProps({ resolutionMode: 'routedByCheck' });
+    const required = root.querySelector('[data-recipe-produces-empty]');
+    assert.match(required.textContent, /a successful craft makes nothing/);
+    assert.ok(
+      required.classList.contains('manager-recipe-flow-empty'),
+      'outside iterative the step still needs a set, so it keeps the danger note'
+    );
+  });
+
   it('alchemy: two outcome sections — Success and Failure — never "Result Group N"', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({

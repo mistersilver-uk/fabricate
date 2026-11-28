@@ -33,6 +33,7 @@
     groupProduceRowsByResultGroup,
     recipeCheckFact,
   } from '../../../../model/recipeBrowserModel.js';
+  import { resultGroupRequired } from '../../../../../models/iterativeStepConfig.js';
   import IconButton from '../../../components/IconButton.svelte';
   import Select from '../../../components/Select.svelte';
   import RecipeProduceRow from './RecipeProduceRow.svelte';
@@ -291,12 +292,11 @@
   const activeSuccessEmpty = $derived(
     isMultiStep ? !currentStepHasSuccess : successRows.length === 0
   );
-  // Only the terminal step must produce, so an earlier empty step is authored intent (issue 1907),
-  // but ONLY when it declares a group at all: a step with none is still `stepMissingResultGroup`
-  // and keeps the danger note.
+  // Neutral when an earlier step declares a group (issue 1907) or `resultGroupRequired` waives it.
   const isTerminalStep = $derived(!isMultiStep || currentStepIndex === stepModel.length - 1);
   const stepAwardsNothingDeliberately = $derived(
-    !isTerminalStep && (selectedRecipe?.steps?.[currentStepIndex]?.resultGroups?.length ?? 0) > 0
+    !resultGroupRequired(currentStepIndex, stepModel.length, resolutionMode === 'iterative') ||
+      (!isTerminalStep && selectedRecipe?.steps?.[currentStepIndex]?.resultGroups?.length > 0)
   );
   const outcomeNoResults = $derived(
     text('FABRICATE.Admin.Manager.Recipe.OutcomeNoResults', 'No results')
