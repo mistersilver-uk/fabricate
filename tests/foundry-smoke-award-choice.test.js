@@ -76,6 +76,9 @@ const STAGED_READ = Object.freeze({
   },
 });
 
+// What the stage step hands the pick: its run revision and its after-read's charm stacks.
+const STAGED = Object.freeze({ revision: 2, charmStacks: STAGED_READ.charmStacks });
+
 const PICKED_READ = Object.freeze({
   ...STAGED_READ,
   charms: 5,
@@ -148,7 +151,7 @@ const PICK_CASES = [
 ];
 
 const stageHolds = (read) => stageFault(STAGE_BEFORE, read) === null;
-const pickHolds = (read) => pickFault(STAGED_READ, { revision: 2 }, read) === null;
+const pickHolds = (read) => pickFault(STAGED_READ, STAGED, read) === null;
 
 describe('readSettled, positive', () => {
   it('returns the first read every condition holds on, polling every 250 ms', async () => {
@@ -188,7 +191,7 @@ describe('readSettled, positive', () => {
   for (const [label, breakIt, message] of PICK_CASES) {
     it(`the pick poll waits out a read short of its ${label}, which its assertion names`, async () => {
       const short = broken(PICKED_READ, breakIt);
-      const fault = pickFault(STAGED_READ, { revision: 2 }, short);
+      const fault = pickFault(STAGED_READ, STAGED, short);
       assert.ok(fault?.includes(message), fault);
       const { page } = fakePage([short, PICKED_READ]);
       assert.deepStrictEqual(
@@ -198,9 +201,15 @@ describe('readSettled, positive', () => {
     });
   }
 
+  it('names a stack the stage left that is gone before the pick reads', () => {
+    const staged = { ...STAGED, charmStacks: [stack('c0', 1), ...STAGED.charmStacks] };
+    assert.equal(ledgerFault(STAGED_READ, PICKED_READ), null, 'the pick ledger alone misses it');
+    assert.equal(pickFault(STAGED_READ, staged, PICKED_READ), 'charm stack c0 vanished');
+  });
+
   it('holds on the settled reads themselves', () => {
     assert.equal(stageFault(STAGE_BEFORE, STAGED_READ), null);
-    assert.equal(pickFault(STAGED_READ, { revision: 2 }, PICKED_READ), null);
+    assert.equal(pickFault(STAGED_READ, STAGED, PICKED_READ), null);
   });
 });
 
@@ -252,7 +261,7 @@ describe('readSettled, negative with a dwell', () => {
 });
 
 describe('settlePick', () => {
-  const fault = (read) => pickFault(STAGED_READ, { revision: 2 }, read);
+  const fault = (read) => pickFault(STAGED_READ, STAGED, read);
 
   it('names a late extra award after the pick holds at the pick, not the replay', BOUNDED, async () => {
     const extra = broken(PICKED_READ, (r) => {

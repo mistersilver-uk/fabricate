@@ -308,7 +308,10 @@ export function stageFault(before, read) {
   );
 }
 
-/** What the pick step asserts of its read after the settle; null when all of it holds. */
+/**
+ * What the pick step asserts of its read after the settle; null when all of it holds. The ledger
+ * runs against `staged`'s stacks too, so a stack gone between the two steps is named.
+ */
 export function pickFault(before, staged, read) {
   const { run } = read;
   if (!run) return 'no run of the recipe is recorded';
@@ -320,6 +323,7 @@ export function pickFault(before, staged, read) {
   const cards = read.cards - before.cards;
   return (
     ledgerFault(before, read) ??
+    ledgerFault(staged, read) ??
     firstFault([
       [gp === CREDIT, `gp rose by ${gp}`],
       [read.learned?.granted === true, `learned: ${JSON.stringify(read.learned)}`],
@@ -488,7 +492,8 @@ async function proveStageOwesPick(ctx, forge) {
   }
   const actorUuid = await page.evaluate((id) => game.actors.get(id).uuid, crafterId);
   const { id: runId, runRevision: revision } = after.run;
-  return { runId, actorUuid, revision, charms: after.charms, ledger };
+  const { charms, charmStacks } = after;
+  return { runId, actorUuid, revision, charms, charmStacks, ledger };
 }
 
 /** An observer who does not own the crafter is refused `owner-required`, and nothing changes. */
