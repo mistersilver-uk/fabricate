@@ -126,7 +126,7 @@ describe('the editor check, its issue, the system report and the model agree per
   });
 });
 
-describe('a run of Chain Link', () => {
+describe('a run whose step 1 has no result set', () => {
   /** The forge recipe with no result set on step 1, and a recipe-level group no step reads. */
   function chainForge() {
     const json = forgeRecipe({ steps: 2 }).toJSON();

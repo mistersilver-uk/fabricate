@@ -54,6 +54,8 @@ const { RecipeManager } = await import('../../src/systems/RecipeManager.js');
 const { localizeRecipeActivationError, localizeRecipeActivationParts } =
   await import('../../src/utils/recipeActivationMessages.js');
 const { installFoundryUtilsEnv } = await import('../helpers/foundryEnv.js');
+// A lab result carries no id, so the model mints one through Foundry's `randomID`.
+installFoundryUtilsEnv();
 
 const RECIPE_RAW_MODULES = [
   // Issue 1506: the one tone map the converted status pills read at a dynamic site.
@@ -780,9 +782,7 @@ describe('RecipesBrowserView iterative status pills (issue 3010)', () => {
     // The persisted entries: the oracle suite pins the same statuses over the Recipe models.
     const recipes = content.recipes.filter((entry) => entry.craftingSystemId === system.id);
     const context = createIterativeStatusContext(system, recipes);
-    // Activation's own verdict over the lab content, the predicate the store's row reads. A lab
-    // result carries no id, so the model mints one through Foundry's `randomID`.
-    installFoundryUtilsEnv();
+    // Activation's own verdict over the lab content, the predicate the store's row reads.
     const activation = new RecipeManager({
       getCraftingSystemManager: () => ({ getSystem: () => system, getSystems: () => [system] })
     });
