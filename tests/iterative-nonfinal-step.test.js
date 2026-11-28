@@ -106,6 +106,7 @@ describe('the editor check, its issue, the system report and the model agree per
       assert.equal(reportOf(json, mode), missing.length);
       const incomplete = missing.length > 0;
       assert.equal(isRecipeIncomplete(new Recipe(json), json, mode), incomplete, 'model path');
+      assert.equal(isRecipeIncomplete({ ...json }, json, mode), incomplete, 'count-only fallback');
       assert.equal(isIncompleteByCounts(json, mode), incomplete, 'count-only path');
       const system = { ...chainLink().system, resolutionMode: mode };
       const row = (recipe) =>
